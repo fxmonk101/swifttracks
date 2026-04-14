@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Package, Search, MapPin, Phone, Clock, Menu, X } from "lucide-react";
+import { Package, Search, Menu, X, Phone, Clock, Star } from "lucide-react";
 import { useState } from "react";
 
 const AppHeader = () => {
@@ -8,14 +8,13 @@ const AppHeader = () => {
 
   const navItems = [
     { to: "/", label: "Home" },
-    { to: "/track", label: "Track", icon: Search },
+    { to: "/track", label: "Track" },
     { to: "/services", label: "Services" },
     { to: "/support", label: "Support" },
   ];
 
   return (
     <>
-      {/* Top utility bar */}
       <div className="bg-secondary text-secondary-foreground/80 text-xs">
         <div className="container flex items-center justify-between h-8">
           <div className="flex items-center gap-4">
@@ -24,12 +23,13 @@ const AppHeader = () => {
           </div>
           <div className="flex items-center gap-4">
             <Link to="/track" className="hover:text-secondary-foreground transition-colors">Track a Package</Link>
-            <span className="hidden sm:inline">Help & Support</span>
+            <Link to="/reviews" className="hidden sm:inline hover:text-secondary-foreground transition-colors flex items-center gap-1">
+              <Star className="h-3 w-3" /> Reviews
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Main header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="container flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
@@ -41,7 +41,6 @@ const AppHeader = () => {
             </span>
           </Link>
 
-          {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map(({ to, label }) => (
               <Link
@@ -60,6 +59,12 @@ const AppHeader = () => {
 
           <div className="hidden md:flex items-center gap-3">
             <Link
+              to="/quote"
+              className="flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2.5 rounded-md font-display font-bold text-sm tracking-wide hover:bg-accent/90 transition-colors"
+            >
+              GET A QUOTE
+            </Link>
+            <Link
               to="/track"
               className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide hover:bg-primary/90 transition-colors"
             >
@@ -68,7 +73,6 @@ const AppHeader = () => {
             </Link>
           </div>
 
-          {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="md:hidden p-2 text-foreground"
@@ -77,7 +81,6 @@ const AppHeader = () => {
           </button>
         </div>
 
-        {/* Mobile nav */}
         {mobileOpen && (
           <div className="md:hidden border-t border-border bg-card">
             <div className="container py-4 space-y-2">
@@ -95,10 +98,20 @@ const AppHeader = () => {
                   {label}
                 </Link>
               ))}
+              <Link to="/reviews" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-md text-sm font-semibold text-foreground/70 hover:text-foreground hover:bg-muted">
+                Reviews
+              </Link>
+              <Link
+                to="/quote"
+                onClick={() => setMobileOpen(false)}
+                className="block text-center bg-accent text-accent-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2"
+              >
+                GET A QUOTE
+              </Link>
               <Link
                 to="/track"
                 onClick={() => setMobileOpen(false)}
-                className="block text-center bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-3"
+                className="block text-center bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2"
               >
                 TRACK NOW
               </Link>
