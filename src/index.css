@@ -117,3 +117,14 @@
   font-family: 'Barlow', sans-serif !important;
   z-index: 0;
 }
+
+@keyframes flyPlane {
+  0% { transform: translateX(100vw) translateY(0); }
+  50% { transform: translateX(-20vw) translateY(-30px); }
+  100% { transform: translateX(-100vw) translateY(0); }
+}
+
+@keyframes driveVan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
