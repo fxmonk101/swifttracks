@@ -8,39 +8,28 @@
   :root {
     --background: 40 10% 96%;
     --foreground: 240 25% 13%;
-
     --card: 0 0% 100%;
     --card-foreground: 240 25% 13%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 240 25% 13%;
-
     --primary: 357 95% 42%;
     --primary-foreground: 0 0% 100%;
-
     --secondary: 217 82% 23%;
     --secondary-foreground: 0 0% 100%;
-
     --muted: 40 8% 90%;
     --muted-foreground: 215 16% 47%;
-
     --accent: 48 100% 50%;
     --accent-foreground: 240 25% 13%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 40 8% 88%;
     --input: 40 8% 88%;
     --ring: 357 95% 42%;
-
     --radius: 0.5rem;
-
     --success: 142 72% 37%;
     --success-foreground: 0 0% 100%;
     --warning: 32 95% 44%;
     --warning-foreground: 0 0% 100%;
-
     --sidebar-background: 217 82% 23%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 357 95% 42%;
@@ -49,6 +38,40 @@
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 217 82% 30%;
     --sidebar-ring: 357 95% 42%;
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 357 95% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 72% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 48 100% 50%;
+    --accent-foreground: 240 25% 13%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 357 95% 50%;
+    --success: 142 72% 37%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 100%;
+    --sidebar-background: 222 47% 8%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 357 95% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 72% 22%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 20%;
+    --sidebar-ring: 357 95% 50%;
   }
 }
 
@@ -127,4 +150,10 @@
 @keyframes driveVan {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100vw); }
+}
+
+/* RTL support for Arabic */
+[dir="rtl"] .font-mono {
+  direction: ltr;
+  unicode-bidi: embed;
 }
