@@ -1,16 +1,30 @@
 import { Link, useLocation } from "react-router-dom";
-import { Package, Search, Menu, X, Phone, Clock, Star } from "lucide-react";
+import { Package, Search, Menu, X, Phone, Clock, Star, User, LogOut } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { useAuth } from "@/hooks/useAuth";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeToggle from "@/components/ThemeToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const AppHeader = () => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useTranslation();
+  const { user, signOut } = useAuth();
 
   const navItems = [
-    { to: "/", label: "Home" },
-    { to: "/track", label: "Track" },
-    { to: "/services", label: "Services" },
-    { to: "/support", label: "Support" },
+    { to: "/", label: t("nav.home") },
+    { to: "/track", label: t("nav.track") },
+    { to: "/services", label: t("nav.services") },
+    { to: "/international", label: "International" },
+    { to: "/business", label: "Business" },
+    { to: "/support", label: t("nav.support") },
   ];
 
   return (
@@ -22,10 +36,11 @@ const AppHeader = () => {
             <span className="hidden sm:flex items-center gap-1"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM EST</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/track" className="hover:text-secondary-foreground transition-colors">Track a Package</Link>
-            <Link to="/reviews" className="hidden sm:inline hover:text-secondary-foreground transition-colors flex items-center gap-1">
-              <Star className="h-3 w-3" /> Reviews
+            <Link to="/track" className="hover:text-secondary-foreground transition-colors">{t("topBar.trackPackage")}</Link>
+            <Link to="/reviews" className="hidden sm:inline hover:text-secondary-foreground transition-colors">
+              <span className="flex items-center gap-1"><Star className="h-3 w-3" /> {t("nav.reviews")}</span>
             </Link>
+            <LanguageSwitcher />
           </div>
         </div>
       </div>
@@ -41,12 +56,12 @@ const AppHeader = () => {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1">
             {navItems.map(({ to, label }) => (
               <Link
                 key={to}
                 to={to}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+                className={`px-3 py-2 rounded-md text-sm font-semibold transition-colors ${
                   location.pathname === to
                     ? "text-primary bg-primary/5"
                     : "text-foreground/70 hover:text-foreground hover:bg-muted"
@@ -57,32 +72,57 @@ const AppHeader = () => {
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2">
+            <ThemeToggle />
             <Link
               to="/quote"
               className="flex items-center gap-2 bg-accent text-accent-foreground px-4 py-2.5 rounded-md font-display font-bold text-sm tracking-wide hover:bg-accent/90 transition-colors"
             >
-              GET A QUOTE
+              {t("nav.getQuote")}
             </Link>
             <Link
               to="/track"
               className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide hover:bg-primary/90 transition-colors"
             >
               <Search className="h-4 w-4" />
-              TRACK NOW
+              {t("nav.trackNow")}
             </Link>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-foreground/70 hover:text-foreground hover:bg-muted transition-colors">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[100px] truncate">{user.email?.split("@")[0]}</span>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/create-shipment" className="cursor-pointer">Create Shipment</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={signOut} className="cursor-pointer text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" /> {t("nav.signOut")}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link
+                to="/auth"
+                className="flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-foreground/70 hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <User className="h-4 w-4" />
+                {t("nav.signIn")}
+              </Link>
+            )}
           </div>
 
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 text-foreground"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2 lg:hidden">
+            <ThemeToggle />
+            <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-foreground">
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {mobileOpen && (
-          <div className="md:hidden border-t border-border bg-card">
+          <div className="lg:hidden border-t border-border bg-card">
             <div className="container py-4 space-y-2">
               {navItems.map(({ to, label }) => (
                 <Link
@@ -99,21 +139,22 @@ const AppHeader = () => {
                 </Link>
               ))}
               <Link to="/reviews" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-md text-sm font-semibold text-foreground/70 hover:text-foreground hover:bg-muted">
-                Reviews
+                {t("nav.reviews")}
               </Link>
-              <Link
-                to="/quote"
-                onClick={() => setMobileOpen(false)}
-                className="block text-center bg-accent text-accent-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2"
-              >
-                GET A QUOTE
+              {user ? (
+                <button onClick={() => { signOut(); setMobileOpen(false); }} className="block w-full text-left px-4 py-2.5 rounded-md text-sm font-semibold text-destructive hover:bg-muted">
+                  {t("nav.signOut")}
+                </button>
+              ) : (
+                <Link to="/auth" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-md text-sm font-semibold text-foreground/70 hover:text-foreground hover:bg-muted">
+                  {t("nav.signIn")} / {t("nav.signUp")}
+                </Link>
+              )}
+              <Link to="/quote" onClick={() => setMobileOpen(false)} className="block text-center bg-accent text-accent-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2">
+                {t("nav.getQuote")}
               </Link>
-              <Link
-                to="/track"
-                onClick={() => setMobileOpen(false)}
-                className="block text-center bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2"
-              >
-                TRACK NOW
+              <Link to="/track" onClick={() => setMobileOpen(false)} className="block text-center bg-primary text-primary-foreground px-5 py-2.5 rounded-md font-display font-bold text-sm tracking-wide mt-2">
+                {t("nav.trackNow")}
               </Link>
             </div>
           </div>
