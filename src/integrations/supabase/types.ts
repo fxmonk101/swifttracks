@@ -47,6 +47,137 @@ export type Database = {
         }
         Relationships: []
       }
+      shipment_events: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          location: string | null
+          shipment_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          shipment_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string | null
+          shipment_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_events_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipments: {
+        Row: {
+          actual_delivery_date: string | null
+          assigned_driver: string | null
+          created_at: string
+          created_by: string | null
+          current_lat: number | null
+          current_lng: number | null
+          dimensions_height: number | null
+          dimensions_length: number | null
+          dimensions_width: number | null
+          estimated_delivery_date: string | null
+          id: string
+          receiver_city: string
+          receiver_country: string | null
+          receiver_name: string
+          receiver_state: string
+          receiver_street: string | null
+          receiver_zip: string | null
+          requires_signature: boolean | null
+          sender_city: string
+          sender_country: string | null
+          sender_name: string
+          sender_state: string
+          sender_street: string | null
+          sender_zip: string | null
+          service_type: string
+          status: string
+          tracking_id: string
+          updated_at: string
+          weight: number | null
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          assigned_driver?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          dimensions_height?: number | null
+          dimensions_length?: number | null
+          dimensions_width?: number | null
+          estimated_delivery_date?: string | null
+          id?: string
+          receiver_city: string
+          receiver_country?: string | null
+          receiver_name: string
+          receiver_state: string
+          receiver_street?: string | null
+          receiver_zip?: string | null
+          requires_signature?: boolean | null
+          sender_city: string
+          sender_country?: string | null
+          sender_name: string
+          sender_state: string
+          sender_street?: string | null
+          sender_zip?: string | null
+          service_type?: string
+          status?: string
+          tracking_id: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          assigned_driver?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          dimensions_height?: number | null
+          dimensions_length?: number | null
+          dimensions_width?: number | null
+          estimated_delivery_date?: string | null
+          id?: string
+          receiver_city?: string
+          receiver_country?: string | null
+          receiver_name?: string
+          receiver_state?: string
+          receiver_street?: string | null
+          receiver_zip?: string | null
+          requires_signature?: boolean | null
+          sender_city?: string
+          sender_country?: string | null
+          sender_name?: string
+          sender_state?: string
+          sender_street?: string | null
+          sender_zip?: string | null
+          service_type?: string
+          status?: string
+          tracking_id?: string
+          updated_at?: string
+          weight?: number | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -76,6 +207,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      update_shipment_status: {
+        Args: {
+          p_description?: string
+          p_location?: string
+          p_new_status: string
+          p_shipment_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
