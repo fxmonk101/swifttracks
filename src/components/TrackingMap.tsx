@@ -138,19 +138,22 @@ interface TrackingMapProps {
   followTruck?: boolean;
 }
 
-const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading = 0, followTruck = false }: TrackingMapProps) => {
-  const allPoints = [origin, ...routeHistory, currentLocation];
+const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading, followTruck = false }: TrackingMapProps) => {
+  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(currentLocation, 1500);
+  const effectiveHeading = heading ?? computedHeading;
+
+  const allPoints = [origin, ...routeHistory, animatedLoc];
   const polylinePositions = allPoints.map((p): [number, number] => [p.lat, p.lng]);
-  
+
   // Dashed line from current location to destination (remaining route)
   const remainingRoute: [number, number][] = [
-    [currentLocation.lat, currentLocation.lng],
+    [animatedLoc.lat, animatedLoc.lng],
     [destination.lat, destination.lng],
   ];
 
   return (
     <MapContainer
-      center={[currentLocation.lat, currentLocation.lng]}
+      center={[animatedLoc.lat, animatedLoc.lng]}
       zoom={7}
       className="h-full w-full"
       scrollWheelZoom={true}
@@ -188,15 +191,15 @@ const TrackingMap = ({ routeHistory, currentLocation, destination, origin, headi
         </Popup>
       </Marker>
       
-      {/* Truck */}
-      <Marker position={[currentLocation.lat, currentLocation.lng]} icon={createTruckIcon(heading)}>
+      {/* Truck (animated) */}
+      <Marker position={[animatedLoc.lat, animatedLoc.lng]} icon={createTruckIcon(effectiveHeading)}>
         <Popup className="tracking-popup">
           <div className="font-semibold text-xs">🚚 Current Location</div>
         </Popup>
       </Marker>
       
-      <MapAutoFit points={[...allPoints, destination]} />
-      <MapFollowTruck location={currentLocation} follow={followTruck} />
+      <MapAutoFit points={[origin, ...routeHistory, currentLocation, destination]} />
+      <MapFollowTruck location={animatedLoc} follow={followTruck} />
     </MapContainer>
   );
 };
