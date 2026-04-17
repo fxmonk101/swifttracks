@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Truck, MapPin, CheckCircle, AlertTriangle, Search, Download, Plus, Eye, Edit2, Loader2 } from "lucide-react";
+import { Package, Truck, MapPin, CheckCircle, AlertTriangle, Search, Plus, Eye, Edit2, Loader2, Navigation } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,17 +64,64 @@ const AdminPage = () => {
   const [statusDescription, setStatusDescription] = useState("");
   const [statusLocation, setStatusLocation] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [gpsShipment, setGpsShipment] = useState<DBShipment | null>(null);
+  const [gpsLat, setGpsLat] = useState("");
+  const [gpsLng, setGpsLng] = useState("");
+  const [updatingGps, setUpdatingGps] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
       .from("shipments")
       .select("id, tracking_id, service_type, status, sender_name, sender_city, sender_state, receiver_name, receiver_city, receiver_state, weight, estimated_delivery_date, assigned_driver, created_at")
       .order("created_at", { ascending: false });
-    if (data) setShipments(data);
+    if (error) {
+      toast({ title: "Error loading shipments", description: error.message, variant: "destructive" });
+    }
+    if (data) setShipments(data as DBShipment[]);
     setLoading(false);
   };
 
-  useEffect(() => { fetchShipments(); }, []);
+  useEffect(() => {
+    fetchShipments();
+    if (user) {
+      supabase.rpc("is_admin").then(({ data }) => setIsAdmin(!!data));
+    }
+    // Realtime: refresh table when any shipment changes
+    const channel = supabase
+      .channel("admin-shipments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "shipments" }, () => fetchShipments())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const handleUpdateGps = async () => {
+    if (!gpsShipment) return;
+    const lat = parseFloat(gpsLat);
+    const lng = parseFloat(gpsLng);
+    if (isNaN(lat) || isNaN(lng)) {
+      toast({ title: "Invalid coordinates", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+    setUpdatingGps(true);
+    const { data, error } = await supabase.rpc("update_shipment_location", {
+      p_shipment_id: gpsShipment.id,
+      p_lat: lat,
+      p_lng: lng,
+    });
+    if (error) {
+      toast({ title: "Error updating GPS", description: error.message, variant: "destructive" });
+    } else if (data && !(data as any).success) {
+      toast({ title: "Not authorized", description: (data as any).error, variant: "destructive" });
+    } else {
+      toast({ title: "GPS Updated", description: `Truck moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+      setGpsShipment(null);
+      setGpsLat("");
+      setGpsLng("");
+      fetchShipments();
+    }
+    setUpdatingGps(false);
+  };
 
   const stats = [
     { label: "Total Shipments", value: shipments.length, icon: Package, color: "text-secondary" },
