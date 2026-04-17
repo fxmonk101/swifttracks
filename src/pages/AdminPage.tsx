@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Truck, MapPin, CheckCircle, AlertTriangle, Search, Download, Plus, Eye, Edit2, Loader2 } from "lucide-react";
+import { Package, Truck, MapPin, CheckCircle, AlertTriangle, Search, Plus, Eye, Edit2, Loader2, Navigation } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,17 +64,64 @@ const AdminPage = () => {
   const [statusDescription, setStatusDescription] = useState("");
   const [statusLocation, setStatusLocation] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [gpsShipment, setGpsShipment] = useState<DBShipment | null>(null);
+  const [gpsLat, setGpsLat] = useState("");
+  const [gpsLng, setGpsLng] = useState("");
+  const [updatingGps, setUpdatingGps] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
       .from("shipments")
       .select("id, tracking_id, service_type, status, sender_name, sender_city, sender_state, receiver_name, receiver_city, receiver_state, weight, estimated_delivery_date, assigned_driver, created_at")
       .order("created_at", { ascending: false });
-    if (data) setShipments(data);
+    if (error) {
+      toast({ title: "Error loading shipments", description: error.message, variant: "destructive" });
+    }
+    if (data) setShipments(data as DBShipment[]);
     setLoading(false);
   };
 
-  useEffect(() => { fetchShipments(); }, []);
+  useEffect(() => {
+    fetchShipments();
+    if (user) {
+      supabase.rpc("is_admin").then(({ data }) => setIsAdmin(!!data));
+    }
+    // Realtime: refresh table when any shipment changes
+    const channel = supabase
+      .channel("admin-shipments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "shipments" }, () => fetchShipments())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const handleUpdateGps = async () => {
+    if (!gpsShipment) return;
+    const lat = parseFloat(gpsLat);
+    const lng = parseFloat(gpsLng);
+    if (isNaN(lat) || isNaN(lng)) {
+      toast({ title: "Invalid coordinates", description: "Please enter valid numbers", variant: "destructive" });
+      return;
+    }
+    setUpdatingGps(true);
+    const { data, error } = await supabase.rpc("update_shipment_location", {
+      p_shipment_id: gpsShipment.id,
+      p_lat: lat,
+      p_lng: lng,
+    });
+    if (error) {
+      toast({ title: "Error updating GPS", description: error.message, variant: "destructive" });
+    } else if (data && !(data as any).success) {
+      toast({ title: "Not authorized", description: (data as any).error, variant: "destructive" });
+    } else {
+      toast({ title: "GPS Updated", description: `Truck moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+      setGpsShipment(null);
+      setGpsLat("");
+      setGpsLng("");
+      fetchShipments();
+    }
+    setUpdatingGps(false);
+  };
 
   const stats = [
     { label: "Total Shipments", value: shipments.length, icon: Package, color: "text-secondary" },
@@ -182,15 +229,26 @@ const AdminPage = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
       <div className="container py-6 space-y-6">
+        {isAdmin === false && (
+          <Card className="p-4 border-destructive bg-destructive/10">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold text-destructive">You are signed in but not an admin</p>
+                <p className="text-muted-foreground mt-1">Creating and updating shipments requires the admin role. The first user to sign up automatically becomes admin. Sign out and create a fresh account, or ask an existing admin to grant you the role.</p>
+              </div>
+            </div>
+          </Card>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage shipments, drivers, and fleet operations</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage shipments, drivers, and fleet operations {isAdmin && <span className="text-success font-mono">• admin</span>}</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-primary text-primary-foreground font-mono text-xs gap-1.5">
+                <Button size="sm" className="bg-primary text-primary-foreground font-mono text-xs gap-1.5" disabled={isAdmin === false}>
                   <Plus className="h-3.5 w-3.5" /> New Shipment
                 </Button>
               </DialogTrigger>
@@ -312,12 +370,15 @@ const AdminPage = () => {
                       <td className="p-3 hidden md:table-cell text-xs">{s.service_type}</td>
                       <td className="p-3 hidden lg:table-cell text-xs">{s.sender_city}, {s.sender_state}</td>
                       <td className="p-3 hidden lg:table-cell text-xs">{s.receiver_city}, {s.receiver_state}</td>
-                      <td className="p-3 flex gap-1">
+                      <td className="p-3 flex gap-1 flex-wrap">
                         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/track/${s.tracking_id}`)}>
                           <Eye className="h-3 w-3" /> Track
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditingShipment(s); setNewStatus(s.status); }}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditingShipment(s); setNewStatus(s.status); }} disabled={isAdmin === false}>
                           <Edit2 className="h-3 w-3" /> Status
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setGpsShipment(s); setGpsLat(""); setGpsLng(""); }} disabled={isAdmin === false}>
+                          <Navigation className="h-3 w-3" /> GPS
                         </Button>
                       </td>
                     </tr>
@@ -360,6 +421,54 @@ const AdminPage = () => {
               </div>
               <Button onClick={handleUpdateStatus} disabled={updatingStatus} className="w-full bg-primary text-primary-foreground">
                 {updatingStatus ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...</> : "Update Status"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* GPS update dialog */}
+      <Dialog open={!!gpsShipment} onOpenChange={(open) => { if (!open) setGpsShipment(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Update GPS Location</DialogTitle>
+          </DialogHeader>
+          {gpsShipment && (
+            <div className="space-y-4">
+              <p className="font-mono text-sm font-bold">{gpsShipment.tracking_id}</p>
+              <p className="text-xs text-muted-foreground">Move the truck on the live map by entering new coordinates. The tracking page updates in real time.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Latitude</Label>
+                  <Input value={gpsLat} onChange={(e) => setGpsLat(e.target.value)} placeholder="40.7128" type="number" step="any" className="text-sm font-mono" />
+                </div>
+                <div>
+                  <Label className="text-xs">Longitude</Label>
+                  <Input value={gpsLng} onChange={(e) => setGpsLng(e.target.value)} placeholder="-74.0060" type="number" step="any" className="text-sm font-mono" />
+                </div>
+              </div>
+              <div className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
+                <p className="font-semibold">Quick presets:</p>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { name: "NYC", lat: 40.7128, lng: -74.006 },
+                    { name: "Chicago", lat: 41.8827, lng: -87.6233 },
+                    { name: "Denver", lat: 39.7392, lng: -104.9903 },
+                    { name: "LA", lat: 34.0522, lng: -118.2437 },
+                  ].map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => { setGpsLat(String(c.lat)); setGpsLng(String(c.lng)); }}
+                      className="px-2 py-0.5 rounded bg-card border border-border hover:bg-accent transition font-mono"
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button onClick={handleUpdateGps} disabled={updatingGps} className="w-full bg-primary text-primary-foreground">
+                {updatingGps ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...</> : "Update GPS"}
               </Button>
             </div>
           )}

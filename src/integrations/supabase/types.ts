@@ -208,6 +208,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: never; Returns: boolean }
+      update_shipment_location: {
+        Args: { p_lat: number; p_lng: number; p_shipment_id: string }
+        Returns: Json
+      }
       update_shipment_status: {
         Args: {
           p_description?: string

@@ -97,31 +97,54 @@ const TrackPage = () => {
   // Mock shipment fallback
   const mockShipment = id ? getShipmentByTrackingId(id) : null;
 
-  // Try to load from DB whenever id changes
+  // Try to load from DB whenever id changes + subscribe to realtime updates
   useEffect(() => {
     if (!id) { setDbShipment(null); setDbEvents([]); return; }
     setLoading(true);
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const loadEvents = async (sid: string) => {
+      const { data: events } = await supabase
+        .from("shipment_events")
+        .select("status, description, location, created_at")
+        .eq("shipment_id", sid)
+        .order("created_at", { ascending: true });
+      setDbEvents((events || []) as DBEvent[]);
+    };
+
     (async () => {
       const { data: shipment } = await supabase
         .from("shipments")
         .select("*")
         .eq("tracking_id", id)
         .maybeSingle();
-      
+
       if (shipment) {
         setDbShipment(shipment as any);
-        const { data: events } = await supabase
-          .from("shipment_events")
-          .select("status, description, location, created_at")
-          .eq("shipment_id", shipment.id)
-          .order("created_at", { ascending: true });
-        setDbEvents((events || []) as DBEvent[]);
+        await loadEvents(shipment.id);
+
+        channel = supabase
+          .channel(`shipment-${shipment.id}`)
+          .on("postgres_changes",
+            { event: "UPDATE", schema: "public", table: "shipments", filter: `id=eq.${shipment.id}` },
+            (payload) => {
+              setDbShipment(payload.new as any);
+              toast({ title: "Live update", description: "Shipment refreshed" });
+            }
+          )
+          .on("postgres_changes",
+            { event: "INSERT", schema: "public", table: "shipment_events", filter: `shipment_id=eq.${shipment.id}` },
+            () => { loadEvents(shipment.id); }
+          )
+          .subscribe();
       } else {
         setDbShipment(null);
         setDbEvents([]);
       }
       setLoading(false);
     })();
+
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, [id]);
 
   // Determine which data to use (DB or mock)
