@@ -426,6 +426,54 @@ const AdminPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* GPS update dialog */}
+      <Dialog open={!!gpsShipment} onOpenChange={(open) => { if (!open) setGpsShipment(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display">Update GPS Location</DialogTitle>
+          </DialogHeader>
+          {gpsShipment && (
+            <div className="space-y-4">
+              <p className="font-mono text-sm font-bold">{gpsShipment.tracking_id}</p>
+              <p className="text-xs text-muted-foreground">Move the truck on the live map by entering new coordinates. The tracking page updates in real time.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Latitude</Label>
+                  <Input value={gpsLat} onChange={(e) => setGpsLat(e.target.value)} placeholder="40.7128" type="number" step="any" className="text-sm font-mono" />
+                </div>
+                <div>
+                  <Label className="text-xs">Longitude</Label>
+                  <Input value={gpsLng} onChange={(e) => setGpsLng(e.target.value)} placeholder="-74.0060" type="number" step="any" className="text-sm font-mono" />
+                </div>
+              </div>
+              <div className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded space-y-1">
+                <p className="font-semibold">Quick presets:</p>
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    { name: "NYC", lat: 40.7128, lng: -74.006 },
+                    { name: "Chicago", lat: 41.8827, lng: -87.6233 },
+                    { name: "Denver", lat: 39.7392, lng: -104.9903 },
+                    { name: "LA", lat: 34.0522, lng: -118.2437 },
+                  ].map((c) => (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => { setGpsLat(String(c.lat)); setGpsLng(String(c.lng)); }}
+                      className="px-2 py-0.5 rounded bg-card border border-border hover:bg-accent transition font-mono"
+                    >
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button onClick={handleUpdateGps} disabled={updatingGps} className="w-full bg-primary text-primary-foreground">
+                {updatingGps ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...</> : "Update GPS"}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
