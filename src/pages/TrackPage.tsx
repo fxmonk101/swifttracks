@@ -48,7 +48,14 @@ const cityCoords: Record<string, Coordinates> = {
   Atlanta: { lat: 33.749, lng: -84.388 },
 };
 
-const getCoords = (city: string): Coordinates => cityCoords[city] || { lat: 40.7128, lng: -74.006 };
+const getCoords = (city: string): Coordinates => {
+  if (!city) return { lat: 39.8283, lng: -98.5795 };
+  const key = city.trim().toLowerCase();
+  const match = Object.keys(cityCoords).find(
+    (k) => k.toLowerCase() === key || k.toLowerCase().startsWith(key) || key.startsWith(k.toLowerCase())
+  );
+  return match ? cityCoords[match] : { lat: 39.8283, lng: -98.5795 };
+};
 
 type DBShipment = {
   id: string;
@@ -113,13 +120,18 @@ const TrackPage = () => {
     };
 
     (async () => {
-      const { data: shipment } = await supabase
+      const { data: shipment, error: sErr } = await supabase
         .from("shipments")
         .select("*")
         .eq("tracking_id", id)
         .maybeSingle();
 
+      if (sErr) {
+        console.error("[TrackPage] shipment fetch error:", sErr);
+      }
+
       if (shipment) {
+        console.log("[TrackPage] loaded shipment:", shipment);
         setDbShipment(shipment as any);
         await loadEvents(shipment.id);
 
@@ -149,6 +161,11 @@ const TrackPage = () => {
 
   // Determine which data to use (DB or mock)
   const isDB = !!dbShipment;
+  // Supabase returns `numeric` columns as strings — coerce to number so Leaflet doesn't break
+  const num = (v: any, fallback = 0): number => {
+    const n = typeof v === "string" ? parseFloat(v) : v;
+    return Number.isFinite(n) ? n : fallback;
+  };
   const shipment: Shipment | null = isDB
     ? {
         id: dbShipment!.id,
@@ -157,12 +174,15 @@ const TrackPage = () => {
         status: dbShipment!.status as ShipmentStatus,
         sender: { name: dbShipment!.sender_name, street: dbShipment!.sender_street || "", city: dbShipment!.sender_city, state: dbShipment!.sender_state, zip: "", country: "US" },
         receiver: { name: dbShipment!.receiver_name, street: dbShipment!.receiver_street || "", city: dbShipment!.receiver_city, state: dbShipment!.receiver_state, zip: "", country: "US" },
-        weight: dbShipment!.weight || 0,
-        dimensions: { length: dbShipment!.dimensions_length || 0, width: dbShipment!.dimensions_width || 0, height: dbShipment!.dimensions_height || 0 },
+        weight: num(dbShipment!.weight),
+        dimensions: { length: num(dbShipment!.dimensions_length), width: num(dbShipment!.dimensions_width), height: num(dbShipment!.dimensions_height) },
         requiresSignature: dbShipment!.requires_signature || false,
         estimatedDeliveryDate: dbShipment!.estimated_delivery_date || "",
         actualDeliveryDate: dbShipment!.actual_delivery_date || undefined,
-        currentLocation: dbShipment!.current_lat ? { lat: dbShipment!.current_lat, lng: dbShipment!.current_lng! } : getCoords(dbShipment!.sender_city),
+        currentLocation:
+          dbShipment!.current_lat != null && dbShipment!.current_lng != null
+            ? { lat: num(dbShipment!.current_lat), lng: num(dbShipment!.current_lng) }
+            : getCoords(dbShipment!.sender_city),
         events: dbEvents.map((e) => ({ status: e.status as ShipmentStatus, description: e.description || "", location: e.location || "", timestamp: e.created_at })),
         createdAt: "",
       }
