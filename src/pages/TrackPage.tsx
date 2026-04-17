@@ -48,7 +48,14 @@ const cityCoords: Record<string, Coordinates> = {
   Atlanta: { lat: 33.749, lng: -84.388 },
 };
 
-const getCoords = (city: string): Coordinates => cityCoords[city] || { lat: 40.7128, lng: -74.006 };
+const getCoords = (city: string): Coordinates => {
+  if (!city) return { lat: 39.8283, lng: -98.5795 };
+  const key = city.trim().toLowerCase();
+  const match = Object.keys(cityCoords).find(
+    (k) => k.toLowerCase() === key || k.toLowerCase().startsWith(key) || key.startsWith(k.toLowerCase())
+  );
+  return match ? cityCoords[match] : { lat: 39.8283, lng: -98.5795 };
+};
 
 type DBShipment = {
   id: string;
