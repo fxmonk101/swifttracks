@@ -229,15 +229,26 @@ const AdminPage = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <AppHeader />
       <div className="container py-6 space-y-6">
+        {isAdmin === false && (
+          <Card className="p-4 border-destructive bg-destructive/10">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="text-sm">
+                <p className="font-bold text-destructive">You are signed in but not an admin</p>
+                <p className="text-muted-foreground mt-1">Creating and updating shipments requires the admin role. The first user to sign up automatically becomes admin. Sign out and create a fresh account, or ask an existing admin to grant you the role.</p>
+              </div>
+            </div>
+          </Card>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage shipments, drivers, and fleet operations</p>
+            <p className="text-sm text-muted-foreground mt-1">Manage shipments, drivers, and fleet operations {isAdmin && <span className="text-success font-mono">• admin</span>}</p>
           </div>
           <div className="flex gap-2">
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-primary text-primary-foreground font-mono text-xs gap-1.5">
+                <Button size="sm" className="bg-primary text-primary-foreground font-mono text-xs gap-1.5" disabled={isAdmin === false}>
                   <Plus className="h-3.5 w-3.5" /> New Shipment
                 </Button>
               </DialogTrigger>
