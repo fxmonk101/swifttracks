@@ -4,6 +4,60 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
 
+// Smoothly interpolate between two coordinates over a duration
+const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
+  const [pos, setPos] = useState<Coordinates>(target);
+  const [heading, setHeading] = useState(0);
+  const fromRef = useRef<Coordinates>(target);
+  const startRef = useRef<number>(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // If first run or no movement, just snap
+    if (fromRef.current.lat === target.lat && fromRef.current.lng === target.lng) {
+      setPos(target);
+      return;
+    }
+
+    const from = { ...pos };
+    fromRef.current = from;
+    startRef.current = performance.now();
+
+    // Compute bearing for heading (degrees)
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const toDeg = (r: number) => (r * 180) / Math.PI;
+    const φ1 = toRad(from.lat);
+    const φ2 = toRad(target.lat);
+    const Δλ = toRad(target.lng - from.lng);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    const bearing = (toDeg(Math.atan2(y, x)) + 360) % 360;
+    setHeading(bearing);
+
+    const tick = (now: number) => {
+      const elapsed = now - startRef.current;
+      const t = Math.min(1, elapsed / durationMs);
+      // Ease in-out cubic
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      setPos({
+        lat: from.lat + (target.lat - from.lat) * eased,
+        lng: from.lng + (target.lng - from.lng) * eased,
+      });
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.lat, target.lng, durationMs]);
+
+  return { pos, heading };
+};
+
 // Animated truck SVG icon with heading rotation
 const createTruckIcon = (heading: number = 0) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
@@ -84,19 +138,22 @@ interface TrackingMapProps {
   followTruck?: boolean;
 }
 
-const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading = 0, followTruck = false }: TrackingMapProps) => {
-  const allPoints = [origin, ...routeHistory, currentLocation];
+const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading, followTruck = false }: TrackingMapProps) => {
+  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(currentLocation, 1500);
+  const effectiveHeading = heading ?? computedHeading;
+
+  const allPoints = [origin, ...routeHistory, animatedLoc];
   const polylinePositions = allPoints.map((p): [number, number] => [p.lat, p.lng]);
-  
+
   // Dashed line from current location to destination (remaining route)
   const remainingRoute: [number, number][] = [
-    [currentLocation.lat, currentLocation.lng],
+    [animatedLoc.lat, animatedLoc.lng],
     [destination.lat, destination.lng],
   ];
 
   return (
     <MapContainer
-      center={[currentLocation.lat, currentLocation.lng]}
+      center={[animatedLoc.lat, animatedLoc.lng]}
       zoom={7}
       className="h-full w-full"
       scrollWheelZoom={true}
@@ -134,15 +191,15 @@ const TrackingMap = ({ routeHistory, currentLocation, destination, origin, headi
         </Popup>
       </Marker>
       
-      {/* Truck */}
-      <Marker position={[currentLocation.lat, currentLocation.lng]} icon={createTruckIcon(heading)}>
+      {/* Truck (animated) */}
+      <Marker position={[animatedLoc.lat, animatedLoc.lng]} icon={createTruckIcon(effectiveHeading)}>
         <Popup className="tracking-popup">
           <div className="font-semibold text-xs">🚚 Current Location</div>
         </Popup>
       </Marker>
       
-      <MapAutoFit points={[...allPoints, destination]} />
-      <MapFollowTruck location={currentLocation} follow={followTruck} />
+      <MapAutoFit points={[origin, ...routeHistory, currentLocation, destination]} />
+      <MapFollowTruck location={animatedLoc} follow={followTruck} />
     </MapContainer>
   );
 };

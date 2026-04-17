@@ -315,7 +315,6 @@ const TrackPage = () => {
                   currentLocation={currentLoc}
                   destination={destination}
                   origin={origin}
-                  heading={210}
                 />
                 <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 border border-border">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Live Tracking</p>
