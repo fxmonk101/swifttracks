@@ -370,12 +370,15 @@ const AdminPage = () => {
                       <td className="p-3 hidden md:table-cell text-xs">{s.service_type}</td>
                       <td className="p-3 hidden lg:table-cell text-xs">{s.sender_city}, {s.sender_state}</td>
                       <td className="p-3 hidden lg:table-cell text-xs">{s.receiver_city}, {s.receiver_state}</td>
-                      <td className="p-3 flex gap-1">
+                      <td className="p-3 flex gap-1 flex-wrap">
                         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/track/${s.tracking_id}`)}>
                           <Eye className="h-3 w-3" /> Track
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditingShipment(s); setNewStatus(s.status); }}>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditingShipment(s); setNewStatus(s.status); }} disabled={isAdmin === false}>
                           <Edit2 className="h-3 w-3" /> Status
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setGpsShipment(s); setGpsLat(""); setGpsLng(""); }} disabled={isAdmin === false}>
+                          <Navigation className="h-3 w-3" /> GPS
                         </Button>
                       </td>
                     </tr>
