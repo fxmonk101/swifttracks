@@ -1,8 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
+
+// Error boundary so any Leaflet hiccup never blanks the entire tracking page
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: unknown) { console.error("[TrackingMap] error:", error); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center">
+          Map unavailable. Shipment details are still shown on the right.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Smoothly interpolate between two coordinates over a duration
 const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
