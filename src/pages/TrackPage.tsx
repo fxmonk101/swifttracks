@@ -214,7 +214,14 @@ const TrackPage = () => {
 
   const origin = shipment ? getCoords(shipment.sender.city) : { lat: 0, lng: 0 };
   const destination = shipment ? getCoords(shipment.receiver.city) : { lat: 0, lng: 0 };
-  const currentLoc = shipment?.currentLocation || origin;
+  const rawCurrent = shipment?.currentLocation || origin;
+  const currentLoc =
+    Number.isFinite(rawCurrent.lat) && Number.isFinite(rawCurrent.lng) ? rawCurrent : origin;
+  const canShowMap =
+    !!shipment &&
+    Number.isFinite(origin.lat) && Number.isFinite(origin.lng) &&
+    Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
+    Number.isFinite(currentLoc.lat) && Number.isFinite(currentLoc.lng);
 
   return (
     <PageTransition>
