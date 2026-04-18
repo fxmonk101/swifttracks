@@ -1,60 +1,46 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Search, Package, Clock, MapPin, Weight, Shield, Truck, Copy, Check, ChevronDown, ChevronUp, Box, Loader2 } from "lucide-react";
+import {
+  Search,
+  Package,
+  MapPin,
+  Weight,
+  Shield,
+  Truck,
+  Copy,
+  Check,
+  Box,
+  Loader2,
+  Calendar,
+  CircleCheck,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import TrackingTimeline from "@/components/TrackingTimeline";
 import TrackingMap from "@/components/TrackingMap";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
-import { getShipmentByTrackingId, routeHistory } from "@/lib/mockData";
-import { STATUS_LABELS, ShipmentStatus, Shipment, ShipmentEvent, Coordinates } from "@/lib/types";
+import { getShipmentByTrackingId } from "@/lib/mockData";
+import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import { toast } from "@/hooks/use-toast";
+import { geocode, US_CENTER } from "@/lib/geocoding";
 
 const statusClass: Record<string, string> = {
-  LABEL_CREATED: "bg-muted text-muted-foreground",
-  PICKED_UP: "bg-secondary/10 text-secondary",
-  IN_TRANSIT: "bg-secondary text-secondary-foreground",
-  AT_FACILITY: "bg-accent text-accent-foreground",
-  OUT_FOR_DELIVERY: "bg-warning text-warning-foreground",
-  DELIVERED: "bg-success text-success-foreground",
-  DELIVERY_ATTEMPTED: "bg-warning text-warning-foreground",
-  EXCEPTION: "bg-destructive text-destructive-foreground",
-  RETURNED: "bg-muted text-muted-foreground",
-};
-
-// City coordinates for map
-const cityCoords: Record<string, Coordinates> = {
-  "New York": { lat: 40.7128, lng: -74.006 },
-  Washington: { lat: 38.9072, lng: -77.0369 },
-  Chicago: { lat: 41.8827, lng: -87.6233 },
-  "Los Angeles": { lat: 34.0522, lng: -118.2437 },
-  "San Francisco": { lat: 37.7749, lng: -122.4194 },
-  Cupertino: { lat: 37.322, lng: -122.0322 },
-  Denver: { lat: 39.7392, lng: -104.9903 },
-  Philadelphia: { lat: 39.9526, lng: -75.1652 },
-  Baltimore: { lat: 39.2904, lng: -76.6122 },
-  Charlotte: { lat: 35.2271, lng: -80.8431 },
-  Miami: { lat: 25.7617, lng: -80.1918 },
-  Houston: { lat: 29.7604, lng: -95.3698 },
-  Dallas: { lat: 32.7767, lng: -96.797 },
-  Seattle: { lat: 47.6062, lng: -122.3321 },
-  Boston: { lat: 42.3601, lng: -71.0589 },
-  Atlanta: { lat: 33.749, lng: -84.388 },
-};
-
-const getCoords = (city: string): Coordinates => {
-  if (!city) return { lat: 39.8283, lng: -98.5795 };
-  const key = city.trim().toLowerCase();
-  const match = Object.keys(cityCoords).find(
-    (k) => k.toLowerCase() === key || k.toLowerCase().startsWith(key) || key.startsWith(k.toLowerCase())
-  );
-  return match ? cityCoords[match] : { lat: 39.8283, lng: -98.5795 };
+  LABEL_CREATED: "bg-muted text-muted-foreground border-border",
+  PICKED_UP: "bg-secondary/10 text-secondary border-secondary/30",
+  IN_TRANSIT: "bg-secondary text-secondary-foreground border-secondary",
+  AT_FACILITY: "bg-accent text-accent-foreground border-accent",
+  OUT_FOR_DELIVERY: "bg-warning text-warning-foreground border-warning",
+  DELIVERED: "bg-success text-success-foreground border-success",
+  DELIVERY_ATTEMPTED: "bg-warning text-warning-foreground border-warning",
+  EXCEPTION: "bg-destructive text-destructive-foreground border-destructive",
+  RETURNED: "bg-muted text-muted-foreground border-border",
 };
 
 type DBShipment = {
@@ -66,10 +52,12 @@ type DBShipment = {
   sender_city: string;
   sender_state: string;
   sender_street: string | null;
+  sender_zip: string | null;
   receiver_name: string;
   receiver_city: string;
   receiver_state: string;
   receiver_street: string | null;
+  receiver_zip: string | null;
   weight: number | null;
   dimensions_length: number | null;
   dimensions_width: number | null;
@@ -79,6 +67,7 @@ type DBShipment = {
   actual_delivery_date: string | null;
   current_lat: number | null;
   current_lng: number | null;
+  created_at: string;
 };
 
 type DBEvent = {
@@ -88,25 +77,35 @@ type DBEvent = {
   created_at: string;
 };
 
+const num = (v: unknown, fallback = 0): number => {
+  const n = typeof v === "string" ? parseFloat(v) : (v as number);
+  return Number.isFinite(n) ? n : fallback;
+};
+
 const TrackPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [input, setInput] = useState(id || "");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // DB shipment
   const [dbShipment, setDbShipment] = useState<DBShipment | null>(null);
   const [dbEvents, setDbEvents] = useState<DBEvent[]>([]);
 
-  // Mock shipment fallback
+  // Geocoded coordinates (async)
+  const [coords, setCoords] = useState<{ origin: Coordinates; destination: Coordinates } | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+
   const mockShipment = id ? getShipmentByTrackingId(id) : null;
 
-  // Try to load from DB whenever id changes + subscribe to realtime updates
+  // Load shipment + subscribe to realtime
   useEffect(() => {
-    if (!id) { setDbShipment(null); setDbEvents([]); return; }
+    if (!id) {
+      setDbShipment(null);
+      setDbEvents([]);
+      return;
+    }
     setLoading(true);
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -126,27 +125,26 @@ const TrackPage = () => {
         .eq("tracking_id", id)
         .maybeSingle();
 
-      if (sErr) {
-        console.error("[TrackPage] shipment fetch error:", sErr);
-      }
+      if (sErr) console.error("[TrackPage] shipment fetch error:", sErr);
 
       if (shipment) {
-        console.log("[TrackPage] loaded shipment:", shipment);
-        setDbShipment(shipment as any);
+        setDbShipment(shipment as DBShipment);
         await loadEvents(shipment.id);
 
         channel = supabase
           .channel(`shipment-${shipment.id}`)
-          .on("postgres_changes",
+          .on(
+            "postgres_changes",
             { event: "UPDATE", schema: "public", table: "shipments", filter: `id=eq.${shipment.id}` },
             (payload) => {
-              setDbShipment(payload.new as any);
+              setDbShipment(payload.new as DBShipment);
               toast({ title: "Live update", description: "Shipment refreshed" });
             }
           )
-          .on("postgres_changes",
+          .on(
+            "postgres_changes",
             { event: "INSERT", schema: "public", table: "shipment_events", filter: `shipment_id=eq.${shipment.id}` },
-            () => { loadEvents(shipment.id); }
+            () => loadEvents(shipment.id)
           )
           .subscribe();
       } else {
@@ -156,37 +154,89 @@ const TrackPage = () => {
       setLoading(false);
     })();
 
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [id]);
 
-  // Determine which data to use (DB or mock)
+  // Build unified shipment object
   const isDB = !!dbShipment;
-  // Supabase returns `numeric` columns as strings — coerce to number so Leaflet doesn't break
-  const num = (v: any, fallback = 0): number => {
-    const n = typeof v === "string" ? parseFloat(v) : v;
-    return Number.isFinite(n) ? n : fallback;
-  };
-  const shipment: Shipment | null = isDB
-    ? {
-        id: dbShipment!.id,
-        trackingId: dbShipment!.tracking_id,
-        serviceType: dbShipment!.service_type as any,
-        status: dbShipment!.status as ShipmentStatus,
-        sender: { name: dbShipment!.sender_name, street: dbShipment!.sender_street || "", city: dbShipment!.sender_city, state: dbShipment!.sender_state, zip: "", country: "US" },
-        receiver: { name: dbShipment!.receiver_name, street: dbShipment!.receiver_street || "", city: dbShipment!.receiver_city, state: dbShipment!.receiver_state, zip: "", country: "US" },
-        weight: num(dbShipment!.weight),
-        dimensions: { length: num(dbShipment!.dimensions_length), width: num(dbShipment!.dimensions_width), height: num(dbShipment!.dimensions_height) },
-        requiresSignature: dbShipment!.requires_signature || false,
-        estimatedDeliveryDate: dbShipment!.estimated_delivery_date || "",
-        actualDeliveryDate: dbShipment!.actual_delivery_date || undefined,
+  const shipment: Shipment | null = useMemo(() => {
+    if (isDB && dbShipment) {
+      return {
+        id: dbShipment.id,
+        trackingId: dbShipment.tracking_id,
+        serviceType: dbShipment.service_type as Shipment["serviceType"],
+        status: dbShipment.status as ShipmentStatus,
+        sender: {
+          name: dbShipment.sender_name,
+          street: dbShipment.sender_street || "",
+          city: dbShipment.sender_city,
+          state: dbShipment.sender_state,
+          zip: dbShipment.sender_zip || "",
+          country: "US",
+        },
+        receiver: {
+          name: dbShipment.receiver_name,
+          street: dbShipment.receiver_street || "",
+          city: dbShipment.receiver_city,
+          state: dbShipment.receiver_state,
+          zip: dbShipment.receiver_zip || "",
+          country: "US",
+        },
+        weight: num(dbShipment.weight),
+        dimensions: {
+          length: num(dbShipment.dimensions_length),
+          width: num(dbShipment.dimensions_width),
+          height: num(dbShipment.dimensions_height),
+        },
+        requiresSignature: dbShipment.requires_signature || false,
+        estimatedDeliveryDate: dbShipment.estimated_delivery_date || "",
+        actualDeliveryDate: dbShipment.actual_delivery_date || undefined,
         currentLocation:
-          dbShipment!.current_lat != null && dbShipment!.current_lng != null
-            ? { lat: num(dbShipment!.current_lat), lng: num(dbShipment!.current_lng) }
-            : getCoords(dbShipment!.sender_city),
-        events: dbEvents.map((e) => ({ status: e.status as ShipmentStatus, description: e.description || "", location: e.location || "", timestamp: e.created_at })),
-        createdAt: "",
-      }
-    : mockShipment || null;
+          dbShipment.current_lat != null && dbShipment.current_lng != null
+            ? { lat: num(dbShipment.current_lat), lng: num(dbShipment.current_lng) }
+            : undefined as unknown as Coordinates,
+        events: dbEvents.map((e) => ({
+          status: e.status as ShipmentStatus,
+          description: e.description || "",
+          location: e.location || "",
+          timestamp: e.created_at,
+        })),
+        createdAt: dbShipment.created_at,
+      };
+    }
+    return mockShipment || null;
+  }, [isDB, dbShipment, dbEvents, mockShipment]);
+
+  // Geocode origin & destination whenever shipment changes
+  useEffect(() => {
+    if (!shipment) {
+      setCoords(null);
+      return;
+    }
+    let cancelled = false;
+    setGeoLoading(true);
+    (async () => {
+      const buildQuery = (s: { street: string; city: string; state: string; zip: string }) => {
+        const parts = [s.city, s.state, s.zip, "USA"].filter(Boolean);
+        return parts.join(", ");
+      };
+      const [o, d] = await Promise.all([
+        geocode(buildQuery(shipment.sender)),
+        geocode(buildQuery(shipment.receiver)),
+      ]);
+      if (cancelled) return;
+      setCoords({
+        origin: o || US_CENTER,
+        destination: d || US_CENTER,
+      });
+      setGeoLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [shipment?.id, shipment?.sender.city, shipment?.receiver.city]);
 
   const handleSearch = () => {
     if (!input.trim()) return;
@@ -194,7 +244,6 @@ const TrackPage = () => {
     navigate(`/track/${input.trim()}`);
   };
 
-  // After navigation, check if found
   useEffect(() => {
     if (id && !loading && !dbShipment && !mockShipment) {
       setError("Shipment not found. Check the tracking ID and try again.");
@@ -212,27 +261,57 @@ const TrackPage = () => {
     }
   };
 
-  const origin = shipment ? getCoords(shipment.sender.city) : { lat: 0, lng: 0 };
-  const destination = shipment ? getCoords(shipment.receiver.city) : { lat: 0, lng: 0 };
-  const rawCurrent = shipment?.currentLocation || origin;
+  const origin = coords?.origin || US_CENTER;
+  const destination = coords?.destination || US_CENTER;
   const currentLoc =
-    Number.isFinite(rawCurrent.lat) && Number.isFinite(rawCurrent.lng) ? rawCurrent : origin;
+    shipment?.currentLocation && Number.isFinite(shipment.currentLocation.lat)
+      ? shipment.currentLocation
+      : origin;
+
+  const hasGps = !!(shipment?.currentLocation && Number.isFinite(shipment.currentLocation.lat));
   const canShowMap =
     !!shipment &&
-    Number.isFinite(origin.lat) && Number.isFinite(origin.lng) &&
-    Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
-    Number.isFinite(currentLoc.lat) && Number.isFinite(currentLoc.lng);
+    !!coords &&
+    Number.isFinite(origin.lat) &&
+    Number.isFinite(destination.lat) &&
+    Number.isFinite(currentLoc.lat);
+
+  const formatDate = (iso?: string) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return "—";
+    }
+  };
+  const formatDateTime = (iso?: string) => {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("en-US", {
+        month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+      });
+    } catch {
+      return "—";
+    }
+  };
+
+  const isDelivered = shipment?.status === "DELIVERED";
+  const isException = shipment?.status === "EXCEPTION" || shipment?.status === "DELIVERY_ATTEMPTED";
 
   return (
     <PageTransition>
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-muted/20">
         <AppHeader />
 
-        {/* Hero search bar */}
+        {/* Hero search */}
         <div className="bg-secondary py-8">
           <div className="container">
-            <h1 className="font-display text-2xl md:text-3xl font-bold text-secondary-foreground mb-1 text-center">Track Your Shipment</h1>
-            <p className="text-secondary-foreground/60 text-sm text-center mb-5">Enter your SwiftTrack tracking number to get real-time updates</p>
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-secondary-foreground mb-1 text-center">
+              Track Your Shipment
+            </h1>
+            <p className="text-secondary-foreground/60 text-sm text-center mb-5">
+              Enter your SwiftTrack tracking number for real-time updates
+            </p>
             <div className="flex gap-2 max-w-2xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-secondary-foreground/40" />
@@ -248,11 +327,14 @@ const TrackPage = () => {
                 <Search className="h-4 w-4 mr-2" /> TRACK
               </Button>
             </div>
-            {error && <p className="text-center text-primary-foreground text-sm mt-3 font-mono bg-primary/20 rounded py-2 max-w-2xl mx-auto">{error}</p>}
+            {error && (
+              <p className="text-center text-primary-foreground text-sm mt-3 font-mono bg-primary/20 rounded py-2 max-w-2xl mx-auto">
+                {error}
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Loading */}
         {loading && id && (
           <div className="flex-1 flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -268,139 +350,252 @@ const TrackPage = () => {
               </div>
               <div>
                 <h2 className="font-display text-3xl font-bold text-foreground mb-2">Where's My Package?</h2>
-                <p className="text-muted-foreground">Enter your SwiftTrack tracking ID above to get real-time updates, live map, and delivery timeline.</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wider font-semibold">Try a demo tracking ID</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {["ST-2024-AB3F7K9M", "ST-2024-XK9P2L4N", "ST-2024-MN7Q8R2T", "ST-2024-PL5W3Y8Z"].map((tid) => (
-                    <button
-                      key={tid}
-                      onClick={() => { setInput(tid); navigate(`/track/${tid}`); }}
-                      className="font-mono text-xs px-4 py-2 rounded-lg bg-card border border-border text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 shadow-sm"
-                    >
-                      {tid}
-                    </button>
-                  ))}
-                </div>
+                <p className="text-muted-foreground">
+                  Enter your SwiftTrack tracking ID above to get real-time updates, live map, and delivery timeline.
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Tracking results */}
+        {/* Tracking results — USPS-style layout */}
         {shipment && !loading && (
-          <div className="flex-1 flex flex-col">
-            {/* Status bar & progress */}
-            <div className="border-b border-border bg-card">
-              <div className="container py-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                      <Truck className="h-5 w-5 text-secondary-foreground" />
+          <div className="flex-1">
+            <div className="container py-6 space-y-5">
+              {/* === Header card: tracking number + status banner === */}
+              <Card className="overflow-hidden border-border">
+                <div className="p-5 border-b border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Tracking Number</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <h2 className="font-mono text-xl font-bold text-foreground">{shipment.trackingId}</h2>
+                      <button onClick={copyTracking} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                      </button>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="font-mono text-lg font-bold">{shipment.trackingId}</h2>
-                        <button onClick={copyTracking} className="text-muted-foreground hover:text-foreground transition-colors">
-                          {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge className={`${statusClass[shipment.status]} text-xs font-mono`}>{STATUS_LABELS[shipment.status]}</Badge>
-                        <span className="text-xs text-muted-foreground">{shipment.serviceType}</span>
-                      </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Service: <span className="font-semibold text-foreground">{shipment.serviceType}</span>
+                      {shipment.requiresSignature && (
+                        <span className="ml-3 inline-flex items-center gap-1 text-accent">
+                          <Shield className="h-3 w-3" /> Signature required
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
+                    {STATUS_LABELS[shipment.status]}
+                  </Badge>
+                </div>
+
+                {/* Hero status block */}
+                <div
+                  className={`px-5 py-6 ${
+                    isDelivered
+                      ? "bg-success/10 border-l-4 border-success"
+                      : isException
+                      ? "bg-destructive/10 border-l-4 border-destructive"
+                      : "bg-secondary/5 border-l-4 border-secondary"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isDelivered ? "bg-success text-success-foreground" : isException ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground"
+                      }`}
+                    >
+                      {isDelivered ? <CircleCheck className="h-6 w-6" /> : isException ? <AlertCircle className="h-6 w-6" /> : <Truck className="h-6 w-6" />}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-display text-xl font-bold text-foreground mb-1">
+                        {isDelivered ? "Delivered" : isException ? "Delivery Issue" : STATUS_LABELS[shipment.status]}
+                      </h3>
+                      {isDelivered && shipment.actualDeliveryDate ? (
+                        <p className="text-sm text-muted-foreground">
+                          Delivered on <span className="font-semibold text-foreground">{formatDateTime(shipment.actualDeliveryDate)}</span>
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">Expected delivery:</span>{" "}
+                            {formatDate(shipment.estimatedDeliveryDate)}
+                          </p>
+                          {shipment.events.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Last update: {shipment.events[shipment.events.length - 1].description} —{" "}
+                              {formatDateTime(shipment.events[shipment.events.length - 1].timestamp)}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-6 text-sm">
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">From</p>
-                      <p className="font-semibold">{shipment.sender.city}, {shipment.sender.state}</p>
+                </div>
+
+                {/* Progress bar */}
+                <div className="px-5 py-5 bg-card">
+                  <TrackingProgressBar currentStatus={shipment.status} />
+                </div>
+              </Card>
+
+              {/* === Map + sidebar === */}
+              <div className="grid lg:grid-cols-3 gap-5">
+                <Card className="lg:col-span-2 overflow-hidden border-border">
+                  <div className="px-5 py-3 border-b border-border bg-card flex items-center justify-between">
+                    <div>
+                      <h3 className="font-display text-sm font-bold text-foreground">Live Map</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {hasGps ? "Real-time GPS location" : geoLoading ? "Locating addresses…" : "Showing route"}
+                      </p>
                     </div>
-                    <div className="text-muted-foreground">→</div>
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground">To</p>
-                      <p className="font-semibold">{shipment.receiver.city}, {shipment.receiver.state}</p>
-                    </div>
-                    {shipment.estimatedDeliveryDate && (
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">Est. Delivery</p>
-                        <p className="font-semibold">{new Date(shipment.estimatedDeliveryDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+                    {hasGps && (
+                      <Badge className="bg-success/10 text-success border-success/30 text-[10px] font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5 animate-pulse" />
+                        LIVE
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="h-[420px] relative">
+                    {canShowMap ? (
+                      <TrackingMap
+                        routeHistory={[]}
+                        currentLocation={currentLoc}
+                        destination={destination}
+                        origin={origin}
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        Loading map…
                       </div>
                     )}
                   </div>
-                </div>
-                <TrackingProgressBar currentStatus={shipment.status} />
-              </div>
-            </div>
+                </Card>
 
-            {/* Map & Details */}
-            <div className="flex-1 flex flex-col lg:flex-row">
-              <div className="h-[45vh] lg:h-auto lg:flex-[3] relative">
-                {canShowMap ? (
-                  <TrackingMap
-                    routeHistory={isDB ? [] : routeHistory}
-                    currentLocation={currentLoc}
-                    destination={destination}
-                    origin={origin}
-                  />
+                {/* Right sidebar: addresses */}
+                <div className="space-y-5">
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-secondary/10 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-secondary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Shipped From
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{shipment.sender.name}</p>
+                    {shipment.sender.street && (
+                      <p className="text-xs text-muted-foreground mt-1">{shipment.sender.street}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {shipment.sender.city}, {shipment.sender.state} {shipment.sender.zip}
+                    </p>
+                  </Card>
+
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Delivering To
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{shipment.receiver.name}</p>
+                    {shipment.receiver.street && (
+                      <p className="text-xs text-muted-foreground mt-1">{shipment.receiver.street}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {shipment.receiver.city}, {shipment.receiver.state} {shipment.receiver.zip}
+                    </p>
+                  </Card>
+
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Expected Delivery
+                      </h3>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">{formatDate(shipment.estimatedDeliveryDate)}</p>
+                  </Card>
+                </div>
+              </div>
+
+              {/* === Package details === */}
+              <Card className="border-border">
+                <div className="px-5 py-3 border-b border-border bg-card">
+                  <h3 className="font-display text-sm font-bold text-foreground">Package Details</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-border">
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Weight className="h-3 w-3" /> Weight
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.weight || "—"} kg</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Box className="h-3 w-3" /> Dimensions
+                    </div>
+                    <p className="text-sm font-semibold">
+                      {shipment.dimensions.length}×{shipment.dimensions.width}×{shipment.dimensions.height} cm
+                    </p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Truck className="h-3 w-3" /> Service
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.serviceType}</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Shield className="h-3 w-3" /> Signature
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.requiresSignature ? "Required" : "Not required"}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* === Tracking history (USPS-style table) === */}
+              <Card className="border-border overflow-hidden">
+                <div className="px-5 py-3 border-b border-border bg-card flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="font-display text-sm font-bold text-foreground">Tracking History</h3>
+                  <span className="text-xs text-muted-foreground">({shipment.events.length} updates)</span>
+                </div>
+                {shipment.events.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">No tracking updates yet.</div>
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center">
-                    Map will appear once GPS coordinates are set for this shipment.
+                  <div className="divide-y divide-border">
+                    {[...shipment.events].reverse().map((e, i) => {
+                      const isLatest = i === 0;
+                      return (
+                        <div
+                          key={`${e.timestamp}-${i}`}
+                          className={`grid grid-cols-12 gap-3 px-5 py-4 ${isLatest ? "bg-secondary/5" : ""}`}
+                        >
+                          <div className="col-span-12 md:col-span-3 text-xs text-muted-foreground">
+                            {formatDateTime(e.timestamp)}
+                          </div>
+                          <div className="col-span-12 md:col-span-3">
+                            <Badge className={`${statusClass[e.status] || "bg-muted text-muted-foreground"} text-[10px] font-mono border`}>
+                              {STATUS_LABELS[e.status as ShipmentStatus] || e.status}
+                            </Badge>
+                          </div>
+                          <div className="col-span-12 md:col-span-4 text-sm text-foreground">{e.description}</div>
+                          <div className="col-span-12 md:col-span-2 text-xs text-muted-foreground flex items-center gap-1">
+                            {e.location && <MapPin className="h-3 w-3" />}
+                            {e.location}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-                <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 border border-border">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Live Tracking</p>
-                  <p className="text-xs font-mono font-bold text-foreground">{shipment.trackingId}</p>
-                </div>
-              </div>
-
-              <div className="lg:flex-[2] lg:max-w-md overflow-y-auto border-l border-border bg-card">
-                <div className="p-5 space-y-5">
-                  <div>
-                    <h3 className="font-display text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Shipment Details</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Card className="p-3 space-y-0.5 bg-muted/30 border-0">
-                        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider"><MapPin className="h-3 w-3" /> From</div>
-                        <p className="text-sm font-semibold">{shipment.sender.name}</p>
-                        <p className="text-xs text-muted-foreground">{shipment.sender.city}, {shipment.sender.state}</p>
-                      </Card>
-                      <Card className="p-3 space-y-0.5 bg-muted/30 border-0">
-                        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider"><MapPin className="h-3 w-3" /> To</div>
-                        <p className="text-sm font-semibold">{shipment.receiver.name}</p>
-                        <p className="text-xs text-muted-foreground">{shipment.receiver.city}, {shipment.receiver.state}</p>
-                      </Card>
-                      <Card className="p-3 space-y-0.5 bg-muted/30 border-0">
-                        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider"><Weight className="h-3 w-3" /> Weight</div>
-                        <p className="text-sm font-semibold">{shipment.weight} kg</p>
-                      </Card>
-                      <Card className="p-3 space-y-0.5 bg-muted/30 border-0">
-                        <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider"><Box className="h-3 w-3" /> Dimensions</div>
-                        <p className="text-sm font-semibold">{shipment.dimensions.length}×{shipment.dimensions.width}×{shipment.dimensions.height} cm</p>
-                      </Card>
-                    </div>
-                  </div>
-
-                  {shipment.requiresSignature && (
-                    <div className="flex items-center gap-2 text-xs bg-accent/20 text-accent-foreground px-3 py-2.5 rounded-lg border border-accent/30">
-                      <Shield className="h-4 w-4 text-accent" /> Signature required on delivery
-                    </div>
-                  )}
-
-                  <div>
-                    <button onClick={() => setShowTimeline(!showTimeline)} className="flex items-center justify-between w-full text-left">
-                      <h3 className="font-display text-sm font-bold text-muted-foreground uppercase tracking-wider">Tracking History</h3>
-                      {showTimeline ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                    </button>
-                    {showTimeline && (
-                      <div className="mt-3">
-                        <TrackingTimeline events={shipment.events} currentStatus={shipment.status} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              </Card>
             </div>
+
+            <Footer />
           </div>
         )}
 
