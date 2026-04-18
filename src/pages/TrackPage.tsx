@@ -214,7 +214,14 @@ const TrackPage = () => {
 
   const origin = shipment ? getCoords(shipment.sender.city) : { lat: 0, lng: 0 };
   const destination = shipment ? getCoords(shipment.receiver.city) : { lat: 0, lng: 0 };
-  const currentLoc = shipment?.currentLocation || origin;
+  const rawCurrent = shipment?.currentLocation || origin;
+  const currentLoc =
+    Number.isFinite(rawCurrent.lat) && Number.isFinite(rawCurrent.lng) ? rawCurrent : origin;
+  const canShowMap =
+    !!shipment &&
+    Number.isFinite(origin.lat) && Number.isFinite(origin.lng) &&
+    Number.isFinite(destination.lat) && Number.isFinite(destination.lng) &&
+    Number.isFinite(currentLoc.lat) && Number.isFinite(currentLoc.lng);
 
   return (
     <PageTransition>
@@ -330,12 +337,18 @@ const TrackPage = () => {
             {/* Map & Details */}
             <div className="flex-1 flex flex-col lg:flex-row">
               <div className="h-[45vh] lg:h-auto lg:flex-[3] relative">
-                <TrackingMap
-                  routeHistory={isDB ? [] : routeHistory}
-                  currentLocation={currentLoc}
-                  destination={destination}
-                  origin={origin}
-                />
+                {canShowMap ? (
+                  <TrackingMap
+                    routeHistory={isDB ? [] : routeHistory}
+                    currentLocation={currentLoc}
+                    destination={destination}
+                    origin={origin}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center">
+                    Map will appear once GPS coordinates are set for this shipment.
+                  </div>
+                )}
                 <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 border border-border">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Live Tracking</p>
                   <p className="text-xs font-mono font-bold text-foreground">{shipment.trackingId}</p>

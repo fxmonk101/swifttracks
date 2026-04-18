@@ -1,8 +1,25 @@
-import { useEffect, useRef, useState } from "react";
+import { Component, ReactNode, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
+
+// Error boundary so any Leaflet hiccup never blanks the entire tracking page
+class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: unknown) { console.error("[TrackingMap] error:", error); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center">
+          Map unavailable. Shipment details are still shown on the right.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Smoothly interpolate between two coordinates over a duration
 const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
@@ -138,69 +155,80 @@ interface TrackingMapProps {
   followTruck?: boolean;
 }
 
+const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
+  !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+
 const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading, followTruck = false }: TrackingMapProps) => {
-  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(currentLocation, 1500);
+  // Guard inputs - if any are bad, fall back so Leaflet never receives NaN
+  const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
+  const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
+  const safeCurrent = isFiniteCoord(currentLocation) ? currentLocation : safeOrigin;
+  const safeHistory = (routeHistory || []).filter(isFiniteCoord);
+
+  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(safeCurrent, 1500);
   const effectiveHeading = heading ?? computedHeading;
 
-  const allPoints = [origin, ...routeHistory, animatedLoc];
+  const allPoints = [safeOrigin, ...safeHistory, animatedLoc];
   const polylinePositions = allPoints.map((p): [number, number] => [p.lat, p.lng]);
 
   // Dashed line from current location to destination (remaining route)
   const remainingRoute: [number, number][] = [
     [animatedLoc.lat, animatedLoc.lng],
-    [destination.lat, destination.lng],
+    [safeDestination.lat, safeDestination.lng],
   ];
 
   return (
-    <MapContainer
-      center={[animatedLoc.lat, animatedLoc.lng]}
-      zoom={7}
-      className="h-full w-full"
-      scrollWheelZoom={true}
-      zoomControl={false}
-      style={{ background: "#e8e4dc" }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      
-      {/* Completed route - solid line */}
-      <Polyline 
-        positions={polylinePositions} 
-        pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }} 
-      />
-      
-      {/* Remaining route - dashed */}
-      <Polyline
-        positions={remainingRoute}
-        pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
-      />
-      
-      {/* Origin */}
-      <Marker position={[origin.lat, origin.lng]} icon={originIcon}>
-        <Popup className="tracking-popup">
-          <div className="font-semibold text-xs">📍 Origin</div>
-        </Popup>
-      </Marker>
-      
-      {/* Destination */}
-      <Marker position={[destination.lat, destination.lng]} icon={destinationIcon}>
-        <Popup className="tracking-popup">
-          <div className="font-semibold text-xs">🏁 Destination</div>
-        </Popup>
-      </Marker>
-      
-      {/* Truck (animated) */}
-      <Marker position={[animatedLoc.lat, animatedLoc.lng]} icon={createTruckIcon(effectiveHeading)}>
-        <Popup className="tracking-popup">
-          <div className="font-semibold text-xs">🚚 Current Location</div>
-        </Popup>
-      </Marker>
-      
-      <MapAutoFit points={[origin, ...routeHistory, currentLocation, destination]} />
-      <MapFollowTruck location={animatedLoc} follow={followTruck} />
-    </MapContainer>
+    <MapErrorBoundary>
+      <MapContainer
+        center={[animatedLoc.lat, animatedLoc.lng]}
+        zoom={7}
+        className="h-full w-full"
+        scrollWheelZoom={true}
+        zoomControl={false}
+        style={{ background: "#e8e4dc" }}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+
+        {/* Completed route - solid line */}
+        <Polyline
+          positions={polylinePositions}
+          pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }}
+        />
+
+        {/* Remaining route - dashed */}
+        <Polyline
+          positions={remainingRoute}
+          pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
+        />
+
+        {/* Origin */}
+        <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
+          <Popup className="tracking-popup">
+            <div className="font-semibold text-xs">📍 Origin</div>
+          </Popup>
+        </Marker>
+
+        {/* Destination */}
+        <Marker position={[safeDestination.lat, safeDestination.lng]} icon={destinationIcon}>
+          <Popup className="tracking-popup">
+            <div className="font-semibold text-xs">🏁 Destination</div>
+          </Popup>
+        </Marker>
+
+        {/* Truck (animated) */}
+        <Marker position={[animatedLoc.lat, animatedLoc.lng]} icon={createTruckIcon(effectiveHeading)}>
+          <Popup className="tracking-popup">
+            <div className="font-semibold text-xs">🚚 Current Location</div>
+          </Popup>
+        </Marker>
+
+        <MapAutoFit points={[safeOrigin, ...safeHistory, safeCurrent, safeDestination]} />
+        <MapFollowTruck location={animatedLoc} follow={followTruck} />
+      </MapContainer>
+    </MapErrorBoundary>
   );
 };
 
