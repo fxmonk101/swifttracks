@@ -337,12 +337,18 @@ const TrackPage = () => {
             {/* Map & Details */}
             <div className="flex-1 flex flex-col lg:flex-row">
               <div className="h-[45vh] lg:h-auto lg:flex-[3] relative">
-                <TrackingMap
-                  routeHistory={isDB ? [] : routeHistory}
-                  currentLocation={currentLoc}
-                  destination={destination}
-                  origin={origin}
-                />
+                {canShowMap ? (
+                  <TrackingMap
+                    routeHistory={isDB ? [] : routeHistory}
+                    currentLocation={currentLoc}
+                    destination={destination}
+                    origin={origin}
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center">
+                    Map will appear once GPS coordinates are set for this shipment.
+                  </div>
+                )}
                 <div className="absolute top-3 left-3 z-[1000] bg-card/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 border border-border">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Live Tracking</p>
                   <p className="text-xs font-mono font-bold text-foreground">{shipment.trackingId}</p>
