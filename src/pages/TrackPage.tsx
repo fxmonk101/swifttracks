@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Search,
@@ -22,7 +22,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TrackingMap from "@/components/TrackingMap";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
-import { getShipmentByTrackingId } from "@/lib/mockData";
+import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
 import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import AppHeader from "@/components/AppHeader";
@@ -82,6 +82,18 @@ const num = (v: unknown, fallback = 0): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371008;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 const TrackPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -92,6 +104,10 @@ const TrackPage = () => {
 
   const [dbShipment, setDbShipment] = useState<DBShipment | null>(null);
   const [dbEvents, setDbEvents] = useState<DBEvent[]>([]);
+  const [locationRouteHistory, setLocationRouteHistory] = useState<Coordinates[]>([]);
+  const [followTruck, setFollowTruck] = useState(false);
+  const [mapFitNonce, setMapFitNonce] = useState(0);
+  const routeHistorySeededRef = useRef(false);
 
   // Geocoded coordinates (async)
   const [coords, setCoords] = useState<{ origin: Coordinates; destination: Coordinates } | null>(null);
@@ -99,11 +115,19 @@ const TrackPage = () => {
 
   const mockShipment = id ? getShipmentByTrackingId(id) : null;
 
+  useEffect(() => {
+    setFollowTruck(false);
+    setMapFitNonce(0);
+    setLocationRouteHistory([]);
+    routeHistorySeededRef.current = false;
+  }, [id]);
+
   // Load shipment + subscribe to realtime
   useEffect(() => {
     if (!id) {
       setDbShipment(null);
       setDbEvents([]);
+      setLocationRouteHistory([]);
       return;
     }
     setLoading(true);
@@ -118,6 +142,24 @@ const TrackPage = () => {
       setDbEvents((events || []) as DBEvent[]);
     };
 
+    const loadSnapshots = async (sid: string) => {
+      const { data, error } = await supabase
+        .from("shipment_location_snapshots")
+        .select("lat,lng")
+        .eq("shipment_id", sid)
+        .order("created_at", { ascending: true })
+        .limit(400);
+      if (error) {
+        console.warn("[TrackPage] snapshots:", error.message);
+        setLocationRouteHistory([]);
+        return;
+      }
+      const pts = (data || [])
+        .map((r) => ({ lat: num(r.lat), lng: num(r.lng) }))
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+      setLocationRouteHistory(pts);
+    };
+
     (async () => {
       const { data: shipment, error: sErr } = await supabase
         .from("shipments")
@@ -130,6 +172,7 @@ const TrackPage = () => {
       if (shipment) {
         setDbShipment(shipment as DBShipment);
         await loadEvents(shipment.id);
+        await loadSnapshots(shipment.id);
 
         channel = supabase
           .channel(`shipment-${shipment.id}`)
@@ -137,8 +180,35 @@ const TrackPage = () => {
             "postgres_changes",
             { event: "UPDATE", schema: "public", table: "shipments", filter: `id=eq.${shipment.id}` },
             (payload) => {
-              setDbShipment(payload.new as DBShipment);
-              toast({ title: "Live update", description: "Shipment refreshed" });
+              const n = payload.new as DBShipment;
+              const o = (payload as { old?: Partial<DBShipment> }).old;
+              setDbShipment(n);
+              if (o && n.status !== o.status) {
+                toast({
+                  title: "Shipment updated",
+                  description: `Status: ${STATUS_LABELS[n.status as ShipmentStatus] || n.status}`,
+                });
+              }
+              const latChanged =
+                o &&
+                (`${n.current_lat}` !== `${o.current_lat}` || `${n.current_lng}` !== `${o.current_lng}`);
+              if (latChanged && o) {
+                const prevLat = num(o.current_lat, NaN);
+                const prevLng = num(o.current_lng, NaN);
+                const curLat = num(n.current_lat, NaN);
+                const curLng = num(n.current_lng, NaN);
+                if (
+                  Number.isFinite(prevLat) &&
+                  Number.isFinite(prevLng) &&
+                  Number.isFinite(curLat) &&
+                  Number.isFinite(curLng)
+                ) {
+                  if (haversineMeters({ lat: prevLat, lng: prevLng }, { lat: curLat, lng: curLng }) > 25000) {
+                    setMapFitNonce((x) => x + 1);
+                  }
+                }
+                void loadSnapshots(shipment.id);
+              }
             }
           )
           .on(
@@ -146,10 +216,21 @@ const TrackPage = () => {
             { event: "INSERT", schema: "public", table: "shipment_events", filter: `shipment_id=eq.${shipment.id}` },
             () => loadEvents(shipment.id)
           )
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "shipment_location_snapshots",
+              filter: `shipment_id=eq.${shipment.id}`,
+            },
+            () => loadSnapshots(shipment.id)
+          )
           .subscribe();
       } else {
         setDbShipment(null);
         setDbEvents([]);
+        setLocationRouteHistory([]);
       }
       setLoading(false);
     })();
@@ -208,6 +289,20 @@ const TrackPage = () => {
     }
     return mockShipment || null;
   }, [isDB, dbShipment, dbEvents, mockShipment]);
+
+  useEffect(() => {
+    if (!isDB || locationRouteHistory.length === 0) return;
+    if (!routeHistorySeededRef.current) {
+      routeHistorySeededRef.current = true;
+      setMapFitNonce((n) => n + 1);
+    }
+  }, [isDB, locationRouteHistory.length]);
+
+  const mapRouteHistory = useMemo(() => {
+    if (isDB) return locationRouteHistory;
+    if (mockShipment) return mockRouteHistory;
+    return [];
+  }, [isDB, locationRouteHistory, mockShipment]);
 
   // Geocode origin & destination whenever shipment changes
   useEffect(() => {
@@ -297,6 +392,9 @@ const TrackPage = () => {
 
   const isDelivered = shipment?.status === "DELIVERED";
   const isException = shipment?.status === "EXCEPTION" || shipment?.status === "DELIVERY_ATTEMPTED";
+  const stationaryAtHold = shipment?.status === "AT_FACILITY" || shipment?.status === "EXCEPTION";
+  const shareUrl =
+    typeof window !== "undefined" && id ? `${window.location.origin}/track/${encodeURIComponent(id)}` : undefined;
 
   return (
     <PageTransition>
@@ -440,12 +538,19 @@ const TrackPage = () => {
               {/* === Map + sidebar === */}
               <div className="grid lg:grid-cols-3 gap-5">
                 <Card className="lg:col-span-2 overflow-hidden border-border">
-                  <div className="px-5 py-3 border-b border-border bg-card flex items-center justify-between">
-                    <div>
+                  <div className="px-5 py-3 border-b border-border bg-card flex items-center justify-between gap-3">
+                    <div className="min-w-0">
                       <h3 className="font-display text-sm font-bold text-foreground">Live Map</h3>
                       <p className="text-xs text-muted-foreground">
                         {hasGps ? "Real-time GPS location" : geoLoading ? "Locating addresses…" : "Showing route"}
                       </p>
+                      {hasGps && (
+                        <p className="text-[10px] font-mono text-muted-foreground mt-1 truncate" title="Current coordinates">
+                          {num(isDB && dbShipment ? dbShipment.current_lat : shipment?.currentLocation?.lat).toFixed(5)}
+                          ,{" "}
+                          {num(isDB && dbShipment ? dbShipment.current_lng : shipment?.currentLocation?.lng).toFixed(5)}
+                        </p>
+                      )}
                     </div>
                     {hasGps && (
                       <Badge className="bg-success/10 text-success border-success/30 text-[10px] font-mono">
@@ -457,10 +562,16 @@ const TrackPage = () => {
                   <div className="h-[420px] relative">
                     {canShowMap ? (
                       <TrackingMap
-                        routeHistory={[]}
+                        routeHistory={mapRouteHistory}
                         currentLocation={currentLoc}
                         destination={destination}
                         origin={origin}
+                        followTruck={followTruck}
+                        onFollowTruckChange={setFollowTruck}
+                        stationaryAtHold={stationaryAtHold}
+                        mapFitNonce={mapFitNonce}
+                        trackingIdForFit={shipment.trackingId}
+                        shareTrackingUrl={shareUrl}
                       />
                     ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">

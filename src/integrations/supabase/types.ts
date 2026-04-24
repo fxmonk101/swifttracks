@@ -82,6 +82,41 @@ export type Database = {
           },
         ]
       }
+      shipment_location_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          lat: number
+          lng: number
+          shipment_id: string
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lat: number
+          lng: number
+          shipment_id: string
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lat?: number
+          lng?: number
+          shipment_id?: string
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_location_snapshots_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -209,8 +244,12 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
-      update_shipment_location: {
+      submit_driver_location: {
         Args: { p_lat: number; p_lng: number; p_shipment_id: string }
+        Returns: Json
+      }
+      update_shipment_location: {
+        Args: { p_lat: number; p_lng: number; p_shipment_id: string; p_source?: string }
         Returns: Json
       }
       update_shipment_status: {

@@ -1,14 +1,28 @@
-import { Component, ReactNode, useEffect, useRef, useState } from "react";
+import { Component, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Crosshair, MapPinned, Maximize2, Share2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
 
 // Error boundary so any Leaflet hiccup never blanks the entire tracking page
 class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(error: unknown) { console.error("[TrackingMap] error:", error); }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("[TrackingMap] error:", error);
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -21,8 +35,7 @@ class MapErrorBoundary extends Component<{ children: ReactNode }, { hasError: bo
   }
 }
 
-// Smoothly interpolate between two coordinates over a duration
-const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
+const useAnimatedPosition = (target: Coordinates, durationMs: number) => {
   const [pos, setPos] = useState<Coordinates>(target);
   const [heading, setHeading] = useState(0);
   const fromRef = useRef<Coordinates>(target);
@@ -30,31 +43,37 @@ const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // If first run or no movement, just snap
     if (fromRef.current.lat === target.lat && fromRef.current.lng === target.lng) {
       setPos(target);
       return;
     }
 
-    const from = { ...pos };
-    fromRef.current = from;
-    startRef.current = performance.now();
-
-    // Compute bearing for heading (degrees)
     const toRad = (d: number) => (d * Math.PI) / 180;
     const toDeg = (r: number) => (r * 180) / Math.PI;
-    const φ1 = toRad(from.lat);
-    const φ2 = toRad(target.lat);
-    const Δλ = toRad(target.lng - from.lng);
-    const y = Math.sin(Δλ) * Math.cos(φ2);
-    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
-    const bearing = (toDeg(Math.atan2(y, x)) + 360) % 360;
-    setHeading(bearing);
+    const bearingBetween = (a: Coordinates, b: Coordinates) => {
+      const φ1 = toRad(a.lat);
+      const φ2 = toRad(b.lat);
+      const Δλ = toRad(b.lng - a.lng);
+      const y = Math.sin(Δλ) * Math.cos(φ2);
+      const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+      return (toDeg(Math.atan2(y, x)) + 360) % 360;
+    };
+
+    const from = { ...pos };
+    fromRef.current = from;
+    setHeading(bearingBetween(from, target));
+
+    if (durationMs <= 0) {
+      setPos(target);
+      fromRef.current = { ...target };
+      return;
+    }
+
+    startRef.current = performance.now();
 
     const tick = (now: number) => {
       const elapsed = now - startRef.current;
       const t = Math.min(1, elapsed / durationMs);
-      // Ease in-out cubic
       const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       setPos({
         lat: from.lat + (target.lat - from.lat) * eased,
@@ -62,6 +81,8 @@ const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
       });
       if (t < 1) {
         rafRef.current = requestAnimationFrame(tick);
+      } else {
+        fromRef.current = { ...target };
       }
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -75,7 +96,6 @@ const useAnimatedPosition = (target: Coordinates, durationMs = 1500) => {
   return { pos, heading };
 };
 
-// Animated truck SVG icon with heading rotation
 const createTruckIcon = (heading: number = 0) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
     <defs>
@@ -95,6 +115,15 @@ const createTruckIcon = (heading: number = 0) => {
     iconAnchor: [24, 24],
   });
 };
+
+const holdIcon = L.divIcon({
+  html: `<div class="relative flex items-center justify-center">
+    <div class="w-9 h-9 rounded-full bg-[hsl(217,82%,28%)] border-[3px] border-white shadow-lg flex items-center justify-center text-lg leading-none">📦</div>
+  </div>`,
+  className: "",
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+});
 
 const destinationIcon = L.divIcon({
   html: `<div class="relative flex items-center justify-center">
@@ -116,118 +145,271 @@ const originIcon = L.divIcon({
   iconAnchor: [10, 10],
 });
 
+export type BasemapId = "road" | "terrain" | "streets" | "satellite";
+
+const BASEMAPS: Record<
+  BasemapId,
+  { url: string; attribution: string; label: string }
+> = {
+  road: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    label: "Road map",
+  },
+  terrain: {
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution:
+      'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="https://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+    label: "Terrain",
+  },
+  streets: {
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    label: "Streets",
+  },
+  satellite: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+    label: "Satellite",
+  },
+};
+
 interface MapAutoFitProps {
   points: Coordinates[];
+  trackingIdForFit: string;
+  mapFitNonce: number;
+  manualFitNonce: number;
+  basemap: BasemapId;
 }
 
-const MapAutoFit = ({ points }: MapAutoFitProps) => {
+const MapAutoFit = ({ points, trackingIdForFit, mapFitNonce, manualFitNonce, basemap }: MapAutoFitProps) => {
   const map = useMap();
-  const fitted = useRef(false);
+  const pointsRef = useRef(points);
+  pointsRef.current = points;
 
   useEffect(() => {
-    if (points.length > 0 && !fitted.current) {
-      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
-      map.fitBounds(bounds, { padding: [60, 60], animate: true, duration: 1.2 });
-      fitted.current = true;
-    }
-  }, [points, map]);
+    const pts = pointsRef.current;
+    if (pts.length === 0) return;
+    const bounds = L.latLngBounds(pts.map((p) => [p.lat, p.lng]));
+    map.fitBounds(bounds, { padding: [56, 56], animate: true, duration: 0.45 });
+  }, [map, trackingIdForFit, mapFitNonce, manualFitNonce, basemap]);
 
   return null;
 };
 
-// Component to keep map centered on truck
 const MapFollowTruck = ({ location, follow }: { location: Coordinates; follow: boolean }) => {
   const map = useMap();
   useEffect(() => {
     if (follow) {
-      map.panTo([location.lat, location.lng], { animate: true, duration: 0.8 });
+      map.panTo([location.lat, location.lng], { animate: true, duration: 0.75 });
     }
-  }, [location, follow, map]);
+  }, [location.lat, location.lng, follow, map]);
   return null;
 };
 
-interface TrackingMapProps {
+export interface TrackingMapProps {
   routeHistory: Coordinates[];
   currentLocation: Coordinates;
   destination: Coordinates;
   origin: Coordinates;
   heading?: number;
   followTruck?: boolean;
+  onFollowTruckChange?: (v: boolean) => void;
+  /** When true, marker snaps (no travel animation) and uses hold/facility styling */
+  stationaryAtHold?: boolean;
+  /** Bump when the route should be re-framed (e.g. tracking id or large GPS jump) */
+  mapFitNonce?: number;
+  trackingIdForFit?: string;
+  shareTrackingUrl?: string;
+  showMapControls?: boolean;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
   !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
 
-const TrackingMap = ({ routeHistory, currentLocation, destination, origin, heading, followTruck = false }: TrackingMapProps) => {
-  // Guard inputs - if any are bad, fall back so Leaflet never receives NaN
+const TrackingMap = ({
+  routeHistory,
+  currentLocation,
+  destination,
+  origin,
+  heading,
+  followTruck = false,
+  onFollowTruckChange,
+  stationaryAtHold = false,
+  mapFitNonce = 0,
+  trackingIdForFit = "",
+  shareTrackingUrl,
+  showMapControls = true,
+}: TrackingMapProps) => {
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
   const safeCurrent = isFiniteCoord(currentLocation) ? currentLocation : safeOrigin;
   const safeHistory = (routeHistory || []).filter(isFiniteCoord);
 
-  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(safeCurrent, 1500);
+  const animMs = stationaryAtHold ? 0 : 1500;
+  const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(safeCurrent, animMs);
   const effectiveHeading = heading ?? computedHeading;
 
-  const allPoints = [safeOrigin, ...safeHistory, animatedLoc];
+  const [basemap, setBasemap] = useState<BasemapId>("road");
+  const [manualFitNonce, setManualFitNonce] = useState(0);
+  const mapWrapRef = useRef<HTMLDivElement>(null);
+
+  const allPoints = useMemo(
+    () => [safeOrigin, ...safeHistory, animatedLoc],
+    [safeOrigin, safeHistory, animatedLoc]
+  );
   const polylinePositions = allPoints.map((p): [number, number] => [p.lat, p.lng]);
 
-  // Dashed line from current location to destination (remaining route)
   const remainingRoute: [number, number][] = [
     [animatedLoc.lat, animatedLoc.lng],
     [safeDestination.lat, safeDestination.lng],
   ];
 
+  const fitPoints = useMemo(
+    () => [safeOrigin, ...safeHistory, safeCurrent, safeDestination].filter(isFiniteCoord),
+    [safeOrigin, safeHistory, safeCurrent, safeDestination]
+  );
+
+  const tile = BASEMAPS[basemap];
+
+  const handleFullscreen = useCallback(() => {
+    const el = mapWrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen();
+    } else {
+      void el.requestFullscreen?.();
+    }
+  }, []);
+
+  const handleShare = useCallback(() => {
+    if (!shareTrackingUrl) return;
+    void navigator.clipboard
+      .writeText(shareTrackingUrl)
+      .then(() => toast({ title: "Link copied", description: "Tracking page URL is on your clipboard." }))
+      .catch(() => toast({ title: "Copy failed", description: "Could not access the clipboard.", variant: "destructive" }));
+  }, [shareTrackingUrl]);
+
   return (
     <MapErrorBoundary>
-      <MapContainer
-        center={[animatedLoc.lat, animatedLoc.lng]}
-        zoom={7}
-        className="h-full w-full"
-        scrollWheelZoom={true}
-        zoomControl={false}
-        style={{ background: "#e8e4dc" }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <div ref={mapWrapRef} className="relative h-full w-full">
+        {showMapControls && (
+          <div className="absolute top-2 left-2 right-2 z-[500] flex flex-wrap items-center gap-2 pointer-events-none">
+            <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+              <Select value={basemap} onValueChange={(v) => setBasemap(v as BasemapId)}>
+                <SelectTrigger className="h-8 w-[140px] text-xs bg-card/95 backdrop-blur border-border shadow-sm">
+                  <SelectValue placeholder="Map" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="road">Road map</SelectItem>
+                  <SelectItem value="terrain">Terrain</SelectItem>
+                  <SelectItem value="streets">Streets</SelectItem>
+                  <SelectItem value="satellite">Satellite</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
+                onClick={() => setManualFitNonce((n) => n + 1)}
+              >
+                <Crosshair className="h-3.5 w-3.5" />
+                Recenter
+              </Button>
+              {onFollowTruckChange && (
+                <Button
+                  type="button"
+                  variant={followTruck ? "default" : "secondary"}
+                  size="sm"
+                  className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
+                  onClick={() => onFollowTruckChange(!followTruck)}
+                  aria-pressed={followTruck}
+                >
+                  <MapPinned className="h-3.5 w-3.5" />
+                  Follow
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
+                onClick={handleFullscreen}
+                title="Fullscreen"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </Button>
+              {shareTrackingUrl && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
+                  onClick={handleShare}
+                  title="Copy tracking link"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* Completed route - solid line */}
-        <Polyline
-          positions={polylinePositions}
-          pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }}
-        />
+        <MapContainer
+          center={[animatedLoc.lat, animatedLoc.lng]}
+          zoom={7}
+          className="h-full w-full"
+          scrollWheelZoom={true}
+          zoomControl={false}
+          style={{ background: "#e8e4dc" }}
+        >
+          <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
 
-        {/* Remaining route - dashed */}
-        <Polyline
-          positions={remainingRoute}
-          pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
-        />
+          <Polyline
+            positions={polylinePositions}
+            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }}
+          />
 
-        {/* Origin */}
-        <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
-          <Popup className="tracking-popup">
-            <div className="font-semibold text-xs">📍 Origin</div>
-          </Popup>
-        </Marker>
+          <Polyline
+            positions={remainingRoute}
+            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
+          />
 
-        {/* Destination */}
-        <Marker position={[safeDestination.lat, safeDestination.lng]} icon={destinationIcon}>
-          <Popup className="tracking-popup">
-            <div className="font-semibold text-xs">🏁 Destination</div>
-          </Popup>
-        </Marker>
+          <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
+            <Popup className="tracking-popup">
+              <div className="font-semibold text-xs">Origin</div>
+            </Popup>
+          </Marker>
 
-        {/* Truck (animated) */}
-        <Marker position={[animatedLoc.lat, animatedLoc.lng]} icon={createTruckIcon(effectiveHeading)}>
-          <Popup className="tracking-popup">
-            <div className="font-semibold text-xs">🚚 Current Location</div>
-          </Popup>
-        </Marker>
+          <Marker position={[safeDestination.lat, safeDestination.lng]} icon={destinationIcon}>
+            <Popup className="tracking-popup">
+              <div className="font-semibold text-xs">Destination</div>
+            </Popup>
+          </Marker>
 
-        <MapAutoFit points={[safeOrigin, ...safeHistory, safeCurrent, safeDestination]} />
-        <MapFollowTruck location={animatedLoc} follow={followTruck} />
-      </MapContainer>
+          <Marker
+            position={[animatedLoc.lat, animatedLoc.lng]}
+            icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
+          >
+            <Popup className="tracking-popup">
+              <div className="font-semibold text-xs">
+                {stationaryAtHold ? "Package location" : "Current location"}
+              </div>
+            </Popup>
+          </Marker>
+
+          <MapAutoFit
+            points={fitPoints}
+            trackingIdForFit={trackingIdForFit}
+            mapFitNonce={mapFitNonce}
+            manualFitNonce={manualFitNonce}
+            basemap={basemap}
+          />
+          <MapFollowTruck location={animatedLoc} follow={followTruck} />
+        </MapContainer>
+      </div>
     </MapErrorBoundary>
   );
 };

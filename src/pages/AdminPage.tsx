@@ -1,6 +1,19 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Truck, MapPin, CheckCircle, AlertTriangle, Search, Plus, Eye, Edit2, Loader2, Navigation } from "lucide-react";
+import {
+  Package,
+  Truck,
+  MapPin,
+  CheckCircle,
+  AlertTriangle,
+  Search,
+  Plus,
+  Eye,
+  Edit2,
+  Loader2,
+  Navigation,
+  Map,
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,11 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import AppHeader from "@/components/AppHeader";
 import { STATUS_LABELS, ShipmentStatus } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { geocode, US_CENTER } from "@/lib/geocoding";
+import TrackingMap from "@/components/TrackingMap";
+import { Coordinates } from "@/lib/types";
 
 const statusClass: Record<string, string> = {
   LABEL_CREATED: "bg-muted text-muted-foreground",
@@ -41,6 +58,13 @@ type DBShipment = {
   estimated_delivery_date: string | null;
   assigned_driver: string | null;
   created_at: string;
+  current_lat: number | null;
+  current_lng: number | null;
+};
+
+const num = (v: unknown, fallback = 0): number => {
+  const n = typeof v === "string" ? parseFloat(v) : (v as number);
+  return Number.isFinite(n) ? n : fallback;
 };
 
 function generateTrackingId() {
@@ -63,17 +87,29 @@ const AdminPage = () => {
   const [newStatus, setNewStatus] = useState("");
   const [statusDescription, setStatusDescription] = useState("");
   const [statusLocation, setStatusLocation] = useState("");
+  const [syncMapFromLocation, setSyncMapFromLocation] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [gpsShipment, setGpsShipment] = useState<DBShipment | null>(null);
   const [gpsLat, setGpsLat] = useState("");
   const [gpsLng, setGpsLng] = useState("");
+  const [gpsAddressQuery, setGpsAddressQuery] = useState("");
+  const [geocodingGps, setGeocodingGps] = useState(false);
   const [updatingGps, setUpdatingGps] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [mapPreviewShipment, setMapPreviewShipment] = useState<DBShipment | null>(null);
+  const [previewCoords, setPreviewCoords] = useState<{
+    origin: Coordinates;
+    destination: Coordinates;
+    current: Coordinates;
+  } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
       .from("shipments")
-      .select("id, tracking_id, service_type, status, sender_name, sender_city, sender_state, receiver_name, receiver_city, receiver_state, weight, estimated_delivery_date, assigned_driver, created_at")
+      .select(
+        "id, tracking_id, service_type, status, sender_name, sender_city, sender_state, receiver_name, receiver_city, receiver_state, weight, estimated_delivery_date, assigned_driver, created_at, current_lat, current_lng"
+      )
       .order("created_at", { ascending: false });
     if (error) {
       toast({ title: "Error loading shipments", description: error.message, variant: "destructive" });
@@ -87,13 +123,40 @@ const AdminPage = () => {
     if (user) {
       supabase.rpc("is_admin").then(({ data }) => setIsAdmin(!!data));
     }
-    // Realtime: refresh table when any shipment changes
     const channel = supabase
       .channel("admin-shipments")
       .on("postgres_changes", { event: "*", schema: "public", table: "shipments" }, () => fetchShipments())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+
+  useEffect(() => {
+    if (!mapPreviewShipment) {
+      setPreviewCoords(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    (async () => {
+      const qO = `${mapPreviewShipment.sender_city}, ${mapPreviewShipment.sender_state}`;
+      const qD = `${mapPreviewShipment.receiver_city}, ${mapPreviewShipment.receiver_state}`;
+      const [o, d] = await Promise.all([geocode(qO), geocode(qD)]);
+      if (cancelled) return;
+      const origin = o || US_CENTER;
+      const destination = d || US_CENTER;
+      const current =
+        mapPreviewShipment.current_lat != null && mapPreviewShipment.current_lng != null
+          ? { lat: num(mapPreviewShipment.current_lat), lng: num(mapPreviewShipment.current_lng) }
+          : origin;
+      setPreviewCoords({ origin, destination, current });
+      setPreviewLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mapPreviewShipment]);
 
   const handleUpdateGps = async () => {
     if (!gpsShipment) return;
@@ -108,19 +171,39 @@ const AdminPage = () => {
       p_shipment_id: gpsShipment.id,
       p_lat: lat,
       p_lng: lng,
+      p_source: "admin_manual",
     });
     if (error) {
       toast({ title: "Error updating GPS", description: error.message, variant: "destructive" });
-    } else if (data && !(data as any).success) {
-      toast({ title: "Not authorized", description: (data as any).error, variant: "destructive" });
+    } else if (data && !(data as { success?: boolean }).success) {
+      toast({ title: "Not authorized", description: (data as { error?: string }).error, variant: "destructive" });
     } else {
       toast({ title: "GPS Updated", description: `Truck moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}` });
       setGpsShipment(null);
       setGpsLat("");
       setGpsLng("");
+      setGpsAddressQuery("");
       fetchShipments();
     }
     setUpdatingGps(false);
+  };
+
+  const handleGeocodeGpsAddress = async () => {
+    const q = gpsAddressQuery.trim();
+    if (!q) {
+      toast({ title: "Enter an address", description: "Type a city or full address to geocode.", variant: "destructive" });
+      return;
+    }
+    setGeocodingGps(true);
+    const g = await geocode(q);
+    setGeocodingGps(false);
+    if (!g) {
+      toast({ title: "Not found", description: "Could not resolve that address.", variant: "destructive" });
+      return;
+    }
+    setGpsLat(String(g.lat));
+    setGpsLng(String(g.lng));
+    toast({ title: "Coordinates set", description: `${g.lat.toFixed(4)}, ${g.lng.toFixed(4)}` });
   };
 
   const stats = [
@@ -147,27 +230,30 @@ const AdminPage = () => {
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
 
-    const { data, error } = await supabase.from("shipments").insert({
-      tracking_id: trackingId,
-      service_type: form.get("serviceType") as string || "STANDARD",
-      sender_name: form.get("senderName") as string,
-      sender_city: form.get("senderCity") as string,
-      sender_state: form.get("senderState") as string,
-      sender_street: form.get("senderStreet") as string,
-      receiver_name: form.get("receiverName") as string,
-      receiver_city: form.get("receiverCity") as string,
-      receiver_state: form.get("receiverState") as string,
-      receiver_street: form.get("receiverStreet") as string,
-      weight: parseFloat(form.get("weight") as string) || 0,
-      requires_signature: form.get("signature") === "on",
-      estimated_delivery_date: form.get("estDelivery") as string || null,
-      created_by: user.id,
-    }).select().single();
+    const { data, error } = await supabase
+      .from("shipments")
+      .insert({
+        tracking_id: trackingId,
+        service_type: (form.get("serviceType") as string) || "STANDARD",
+        sender_name: form.get("senderName") as string,
+        sender_city: form.get("senderCity") as string,
+        sender_state: form.get("senderState") as string,
+        sender_street: form.get("senderStreet") as string,
+        receiver_name: form.get("receiverName") as string,
+        receiver_city: form.get("receiverCity") as string,
+        receiver_state: form.get("receiverState") as string,
+        receiver_street: form.get("receiverStreet") as string,
+        weight: parseFloat(form.get("weight") as string) || 0,
+        requires_signature: form.get("signature") === "on",
+        estimated_delivery_date: (form.get("estDelivery") as string) || null,
+        created_by: user.id,
+      })
+      .select()
+      .single();
 
     if (error) {
       toast({ title: "Error creating shipment", description: error.message, variant: "destructive" });
     } else {
-      // Also create the initial LABEL_CREATED event
       if (data) {
         await supabase.from("shipment_events").insert({
           shipment_id: data.id,
@@ -196,16 +282,60 @@ const AdminPage = () => {
 
     if (error) {
       toast({ title: "Error updating status", description: error.message, variant: "destructive" });
-    } else if (data && !(data as any).success) {
-      toast({ title: "Error", description: (data as any).error || "Failed to update", variant: "destructive" });
-    } else {
-      toast({ title: "Status Updated", description: `${editingShipment.tracking_id} → ${STATUS_LABELS[newStatus as ShipmentStatus] || newStatus}` });
-      setEditingShipment(null);
-      setNewStatus("");
-      setStatusDescription("");
-      setStatusLocation("");
-      fetchShipments();
+      setUpdatingStatus(false);
+      return;
     }
+    if (data && !(data as { success?: boolean }).success) {
+      toast({ title: "Error", description: (data as { error?: string }).error || "Failed to update", variant: "destructive" });
+      setUpdatingStatus(false);
+      return;
+    }
+
+    if (syncMapFromLocation && statusLocation.trim()) {
+      const g = await geocode(statusLocation.trim());
+      if (!g) {
+        toast({
+          title: "Status saved — map pin unchanged",
+          description: "Could not geocode the location text. Set GPS manually if needed.",
+          variant: "destructive",
+        });
+      } else {
+        const { data: locData, error: locErr } = await supabase.rpc("update_shipment_location", {
+          p_shipment_id: editingShipment.id,
+          p_lat: g.lat,
+          p_lng: g.lng,
+          p_source: "admin_status_geocode",
+        });
+        if (locErr) {
+          toast({ title: "Status saved", description: `Map pin not updated: ${locErr.message}`, variant: "destructive" });
+        } else if (locData && !(locData as { success?: boolean }).success) {
+          toast({ title: "Status saved", description: "Map pin not updated (not authorized).", variant: "destructive" });
+        } else {
+          toast({
+            title: "Status & map updated",
+            description: `${editingShipment.tracking_id} → ${STATUS_LABELS[newStatus as ShipmentStatus] || newStatus}`,
+          });
+          setEditingShipment(null);
+          setNewStatus("");
+          setStatusDescription("");
+          setStatusLocation("");
+          fetchShipments();
+          setUpdatingStatus(false);
+          return;
+        }
+      }
+    } else {
+      toast({
+        title: "Status Updated",
+        description: `${editingShipment.tracking_id} → ${STATUS_LABELS[newStatus as ShipmentStatus] || newStatus}`,
+      });
+    }
+
+    setEditingShipment(null);
+    setNewStatus("");
+    setStatusDescription("");
+    setStatusLocation("");
+    fetchShipments();
     setUpdatingStatus(false);
   };
 
@@ -218,7 +348,9 @@ const AdminPage = () => {
             <AlertTriangle className="h-12 w-12 text-warning mx-auto" />
             <h2 className="font-display text-2xl font-bold">Admin Access Required</h2>
             <p className="text-muted-foreground text-sm">You need to sign in with an admin account to access this dashboard.</p>
-            <Button onClick={() => navigate("/auth")} className="bg-primary text-primary-foreground">Sign In</Button>
+            <Button onClick={() => navigate("/auth")} className="bg-primary text-primary-foreground">
+              Sign In
+            </Button>
           </Card>
         </div>
       </div>
@@ -235,7 +367,9 @@ const AdminPage = () => {
               <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
               <div className="text-sm">
                 <p className="font-bold text-destructive">You are signed in but not an admin</p>
-                <p className="text-muted-foreground mt-1">Creating and updating shipments requires the admin role. The first user to sign up automatically becomes admin. Sign out and create a fresh account, or ask an existing admin to grant you the role.</p>
+                <p className="text-muted-foreground mt-1">
+                  Creating and updating shipments requires the admin role. The first user to sign up automatically becomes admin. Sign out and create a fresh account, or ask an existing admin to grant you the role.
+                </p>
               </div>
             </div>
           </Card>
@@ -243,7 +377,9 @@ const AdminPage = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage shipments, drivers, and fleet operations {isAdmin && <span className="text-success font-mono">• admin</span>}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage shipments, drivers, and fleet operations {isAdmin && <span className="text-success font-mono">• admin</span>}
+            </p>
           </div>
           <div className="flex gap-2">
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -259,24 +395,50 @@ const AdminPage = () => {
                 <form onSubmit={handleCreateShipment} className="space-y-4">
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Sender</h4>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><Label className="text-xs">Name *</Label><Input name="senderName" required className="text-sm" /></div>
-                    <div><Label className="text-xs">Street</Label><Input name="senderStreet" className="text-sm" /></div>
-                    <div><Label className="text-xs">City *</Label><Input name="senderCity" required className="text-sm" /></div>
-                    <div><Label className="text-xs">State *</Label><Input name="senderState" required className="text-sm" /></div>
+                    <div>
+                      <Label className="text-xs">Name *</Label>
+                      <Input name="senderName" required className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Street</Label>
+                      <Input name="senderStreet" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">City *</Label>
+                      <Input name="senderCity" required className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">State *</Label>
+                      <Input name="senderState" required className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Receiver</h4>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><Label className="text-xs">Name *</Label><Input name="receiverName" required className="text-sm" /></div>
-                    <div><Label className="text-xs">Street</Label><Input name="receiverStreet" className="text-sm" /></div>
-                    <div><Label className="text-xs">City *</Label><Input name="receiverCity" required className="text-sm" /></div>
-                    <div><Label className="text-xs">State *</Label><Input name="receiverState" required className="text-sm" /></div>
+                    <div>
+                      <Label className="text-xs">Name *</Label>
+                      <Input name="receiverName" required className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Street</Label>
+                      <Input name="receiverStreet" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">City *</Label>
+                      <Input name="receiverCity" required className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">State *</Label>
+                      <Input name="receiverState" required className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Package</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Service Type</Label>
                       <Select name="serviceType" defaultValue="EXPRESS">
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="EXPRESS">Express</SelectItem>
                           <SelectItem value="STANDARD">Standard</SelectItem>
@@ -285,15 +447,29 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div><Label className="text-xs">Weight (kg)</Label><Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" /></div>
-                    <div><Label className="text-xs">Est. Delivery</Label><Input name="estDelivery" type="date" className="text-sm" /></div>
+                    <div>
+                      <Label className="text-xs">Weight (kg)</Label>
+                      <Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Est. Delivery</Label>
+                      <Input name="estDelivery" type="date" className="text-sm" />
+                    </div>
                     <div className="flex items-end gap-2 pb-1">
                       <input type="checkbox" name="signature" id="signature" className="rounded" />
-                      <Label htmlFor="signature" className="text-xs">Requires Signature</Label>
+                      <Label htmlFor="signature" className="text-xs">
+                        Requires Signature
+                      </Label>
                     </div>
                   </div>
                   <Button type="submit" disabled={creating} className="w-full bg-primary text-primary-foreground">
-                    {creating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating...</> : "Create Shipment"}
+                    {creating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating...
+                      </>
+                    ) : (
+                      "Create Shipment"
+                    )}
                   </Button>
                 </form>
               </DialogContent>
@@ -301,7 +477,6 @@ const AdminPage = () => {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {stats.map((s) => (
             <Card key={s.label}>
@@ -316,24 +491,31 @@ const AdminPage = () => {
           ))}
         </div>
 
-        {/* Filters */}
         <div className="flex gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search tracking ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 font-mono text-sm" />
+            <Input
+              placeholder="Search tracking ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 font-mono text-sm"
+            />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
               {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v}</SelectItem>
+                <SelectItem key={k} value={k}>
+                  {v}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Table */}
         <Card>
           <div className="overflow-x-auto">
             {loading ? (
@@ -355,6 +537,7 @@ const AdminPage = () => {
                     <th className="text-left p-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider hidden md:table-cell">Service</th>
                     <th className="text-left p-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider hidden lg:table-cell">From</th>
                     <th className="text-left p-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider hidden lg:table-cell">To</th>
+                    <th className="text-left p-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider hidden xl:table-cell">GPS</th>
                     <th className="text-left p-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -368,16 +551,54 @@ const AdminPage = () => {
                         </Badge>
                       </td>
                       <td className="p-3 hidden md:table-cell text-xs">{s.service_type}</td>
-                      <td className="p-3 hidden lg:table-cell text-xs">{s.sender_city}, {s.sender_state}</td>
-                      <td className="p-3 hidden lg:table-cell text-xs">{s.receiver_city}, {s.receiver_state}</td>
+                      <td className="p-3 hidden lg:table-cell text-xs">
+                        {s.sender_city}, {s.sender_state}
+                      </td>
+                      <td className="p-3 hidden lg:table-cell text-xs">
+                        {s.receiver_city}, {s.receiver_state}
+                      </td>
+                      <td className="p-3 hidden xl:table-cell text-[10px] font-mono text-muted-foreground">
+                        {s.current_lat != null && s.current_lng != null
+                          ? `${num(s.current_lat).toFixed(3)}, ${num(s.current_lng).toFixed(3)}`
+                          : "—"}
+                      </td>
                       <td className="p-3 flex gap-1 flex-wrap">
                         <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => navigate(`/track/${s.tracking_id}`)}>
                           <Eye className="h-3 w-3" /> Track
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditingShipment(s); setNewStatus(s.status); }} disabled={isAdmin === false}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => setMapPreviewShipment(s)}
+                          disabled={isAdmin === false}
+                        >
+                          <Map className="h-3 w-3" /> Map
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            setEditingShipment(s);
+                            setNewStatus(s.status);
+                          }}
+                          disabled={isAdmin === false}
+                        >
                           <Edit2 className="h-3 w-3" /> Status
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => { setGpsShipment(s); setGpsLat(""); setGpsLng(""); }} disabled={isAdmin === false}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            setGpsShipment(s);
+                            setGpsLat(s.current_lat != null ? String(s.current_lat) : "");
+                            setGpsLng(s.current_lng != null ? String(s.current_lng) : "");
+                            setGpsAddressQuery("");
+                          }}
+                          disabled={isAdmin === false}
+                        >
                           <Navigation className="h-3 w-3" /> GPS
                         </Button>
                       </td>
@@ -390,8 +611,7 @@ const AdminPage = () => {
         </Card>
       </div>
 
-      {/* Status update dialog */}
-      <Dialog open={!!editingShipment} onOpenChange={(open) => { if (!open) setEditingShipment(null); }}>
+      <Dialog open={!!editingShipment} onOpenChange={(open) => !open && setEditingShipment(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display">Update Shipment Status</DialogTitle>
@@ -399,36 +619,66 @@ const AdminPage = () => {
           {editingShipment && (
             <div className="space-y-4">
               <p className="font-mono text-sm font-bold">{editingShipment.tracking_id}</p>
-              <p className="text-xs text-muted-foreground">Current: <Badge className={`${statusClass[editingShipment.status]} text-xs ml-1`}>{STATUS_LABELS[editingShipment.status as ShipmentStatus] || editingShipment.status}</Badge></p>
+              <p className="text-xs text-muted-foreground">
+                Current:{" "}
+                <Badge className={`${statusClass[editingShipment.status]} text-xs ml-1`}>
+                  {STATUS_LABELS[editingShipment.status as ShipmentStatus] || editingShipment.status}
+                </Badge>
+              </p>
               <div>
                 <Label className="text-xs">New Status</Label>
                 <Select value={newStatus} onValueChange={setNewStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {Object.entries(STATUS_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-xs">Description</Label>
-                <Input value={statusDescription} onChange={(e) => setStatusDescription(e.target.value)} placeholder="e.g. Package arrived at sorting facility" className="text-sm" />
+                <Input
+                  value={statusDescription}
+                  onChange={(e) => setStatusDescription(e.target.value)}
+                  placeholder="e.g. Package arrived at sorting facility"
+                  className="text-sm"
+                />
               </div>
               <div>
                 <Label className="text-xs">Location</Label>
-                <Input value={statusLocation} onChange={(e) => setStatusLocation(e.target.value)} placeholder="e.g. New York, NY" className="text-sm" />
+                <Input
+                  value={statusLocation}
+                  onChange={(e) => setStatusLocation(e.target.value)}
+                  placeholder="e.g. New York, NY"
+                  className="text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox id="sync-map" checked={syncMapFromLocation} onCheckedChange={(c) => setSyncMapFromLocation(c === true)} />
+                <Label htmlFor="sync-map" className="text-xs font-normal leading-tight cursor-pointer">
+                  Update map pin from this location (geocoded)
+                </Label>
               </div>
               <Button onClick={handleUpdateStatus} disabled={updatingStatus} className="w-full bg-primary text-primary-foreground">
-                {updatingStatus ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...</> : "Update Status"}
+                {updatingStatus ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...
+                  </>
+                ) : (
+                  "Update Status"
+                )}
               </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* GPS update dialog */}
-      <Dialog open={!!gpsShipment} onOpenChange={(open) => { if (!open) setGpsShipment(null); }}>
+      <Dialog open={!!gpsShipment} onOpenChange={(open) => !open && setGpsShipment(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display">Update GPS Location</DialogTitle>
@@ -436,7 +686,21 @@ const AdminPage = () => {
           {gpsShipment && (
             <div className="space-y-4">
               <p className="font-mono text-sm font-bold">{gpsShipment.tracking_id}</p>
-              <p className="text-xs text-muted-foreground">Move the truck on the live map by entering new coordinates. The tracking page updates in real time.</p>
+              <p className="text-xs text-muted-foreground">Move the truck on the live map by coordinates or geocode an address.</p>
+              <div>
+                <Label className="text-xs">Address or city</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={gpsAddressQuery}
+                    onChange={(e) => setGpsAddressQuery(e.target.value)}
+                    placeholder="e.g. Memphis, TN"
+                    className="text-sm"
+                  />
+                  <Button type="button" variant="secondary" size="sm" className="shrink-0" disabled={geocodingGps} onClick={handleGeocodeGpsAddress}>
+                    {geocodingGps ? <Loader2 className="h-4 w-4 animate-spin" /> : "Geocode"}
+                  </Button>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs">Latitude</Label>
@@ -459,7 +723,10 @@ const AdminPage = () => {
                     <button
                       key={c.name}
                       type="button"
-                      onClick={() => { setGpsLat(String(c.lat)); setGpsLng(String(c.lng)); }}
+                      onClick={() => {
+                        setGpsLat(String(c.lat));
+                        setGpsLng(String(c.lng));
+                      }}
                       className="px-2 py-0.5 rounded bg-card border border-border hover:bg-accent transition font-mono"
                     >
                       {c.name}
@@ -468,8 +735,49 @@ const AdminPage = () => {
                 </div>
               </div>
               <Button onClick={handleUpdateGps} disabled={updatingGps} className="w-full bg-primary text-primary-foreground">
-                {updatingGps ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...</> : "Update GPS"}
+                {updatingGps ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Updating...
+                  </>
+                ) : (
+                  "Update GPS"
+                )}
               </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!mapPreviewShipment} onOpenChange={(open) => !open && setMapPreviewShipment(null)}>
+        <DialogContent className="max-w-3xl w-[95vw]">
+          <DialogHeader>
+            <DialogTitle className="font-display">Map preview</DialogTitle>
+          </DialogHeader>
+          {mapPreviewShipment && (
+            <div className="space-y-2">
+              <p className="font-mono text-sm text-muted-foreground">{mapPreviewShipment.tracking_id}</p>
+              <div className="h-[320px] rounded-md overflow-hidden border border-border">
+                {previewLoading || !previewCoords ? (
+                  <div className="h-full flex items-center justify-center bg-muted/40">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <TrackingMap
+                    routeHistory={[]}
+                    currentLocation={previewCoords.current}
+                    destination={previewCoords.destination}
+                    origin={previewCoords.origin}
+                    mapFitNonce={1}
+                    trackingIdForFit={mapPreviewShipment.tracking_id}
+                    showMapControls
+                    shareTrackingUrl={
+                      typeof window !== "undefined"
+                        ? `${window.location.origin}/track/${encodeURIComponent(mapPreviewShipment.tracking_id)}`
+                        : undefined
+                    }
+                  />
+                )}
+              </div>
             </div>
           )}
         </DialogContent>
