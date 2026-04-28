@@ -94,6 +94,50 @@ function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng:
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+async function calculateSpeedAndETA(
+  shipmentId: string,
+  currentLocation: Coordinates | null,
+  destination: Coordinates | null,
+  status: string
+): Promise<{ speed: number | null; eta: Date | null }> {
+  // Only calculate if in transit or out for delivery
+  if (!["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(status)) {
+    return { speed: null, eta: null };
+  }
+
+  if (!currentLocation || !destination) {
+    return { speed: null, eta: null };
+  }
+
+  try {
+    // Get analytics from RPC
+    const { data, error } = await supabase.rpc("get_shipment_analytics", {
+      p_shipment_id: shipmentId,
+    });
+
+    if (error || !data) {
+      return { speed: null, eta: null };
+    }
+
+    const speedMph = data.current_speed_mph || 60;
+
+    // Calculate distance to destination using haversine
+    const distanceMeters = haversineMeters(currentLocation, destination);
+    const distanceKm = distanceMeters / 1000;
+    const distanceMiles = distanceKm * 0.621371;
+
+    // Calculate ETA: hours = distance / speed
+    const hoursToDestination = distanceMiles / speedMph;
+    const secondsToDestination = hoursToDestination * 3600;
+    const etaDate = new Date(Date.now() + secondsToDestination * 1000);
+
+    return { speed: speedMph, eta: etaDate };
+  } catch (err) {
+    console.error("Error calculating speed/ETA:", err);
+    return { speed: null, eta: null };
+  }
+}
+
 const TrackPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -112,6 +156,11 @@ const TrackPage = () => {
   // Geocoded coordinates (async)
   const [coords, setCoords] = useState<{ origin: Coordinates; destination: Coordinates } | null>(null);
   const [geoLoading, setGeoLoading] = useState(false);
+
+  // Speed and ETA
+  const [currentSpeed, setCurrentSpeed] = useState<number | null>(null);
+  const [etaTime, setEtaTime] = useState<Date | null>(null);
+  const [etaCountdown, setEtaCountdown] = useState<{ hours: number; minutes: number } | null>(null);
 
   const mockShipment = id ? getShipmentByTrackingId(id) : null;
 
@@ -188,6 +237,11 @@ const TrackPage = () => {
                   title: "Shipment updated",
                   description: `Status: ${STATUS_LABELS[n.status as ShipmentStatus] || n.status}`,
                 });
+                // Queue notification
+                supabase.rpc("queue_delivery_notification", {
+                  p_shipment_id: shipment.id,
+                  p_event_type: "status_change",
+                }).catch(err => console.error("Error queueing notification:", err));
               }
               const latChanged =
                 o &&
@@ -332,6 +386,62 @@ const TrackPage = () => {
       cancelled = true;
     };
   }, [shipment?.id, shipment?.sender.city, shipment?.receiver.city]);
+
+  // Calculate speed and ETA whenever shipment location or status changes
+  useEffect(() => {
+    if (!shipment || !isDB) {
+      setCurrentSpeed(null);
+      setEtaTime(null);
+      return;
+    }
+
+    let cancelled = false;
+    const calculateAsync = async () => {
+      const { speed, eta } = await calculateSpeedAndETA(
+        shipment.id,
+        shipment.currentLocation || null,
+        coords?.destination || null,
+        shipment.status
+      );
+      if (!cancelled) {
+        setCurrentSpeed(speed);
+        setEtaTime(eta);
+      }
+    };
+
+    void calculateAsync();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shipment?.id, shipment?.status, shipment?.currentLocation?.lat, coords?.destination?.lat, isDB]);
+
+  // ETA countdown timer
+  useEffect(() => {
+    if (!etaTime) {
+      setEtaCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = etaTime.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setEtaCountdown(null);
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      setEtaCountdown({ hours, minutes });
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 10000); // Update every 10 seconds
+
+    return () => clearInterval(interval);
+  }, [etaTime]);
 
   const handleSearch = () => {
     if (!input.trim()) return;
@@ -629,6 +739,50 @@ const TrackPage = () => {
                     </div>
                     <p className="text-lg font-bold text-foreground">{formatDate(shipment.estimatedDeliveryDate)}</p>
                   </Card>
+
+                  {/* Speed widget */}
+                  {["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
+                    <Card className="p-5 border-border bg-secondary/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Truck className="h-4 w-4 text-secondary" />
+                        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                          Current Speed
+                        </h3>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {currentSpeed !== null ? `${currentSpeed.toFixed(0)} mph` : "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {currentSpeed === null
+                          ? "Calculating from GPS history..."
+                          : currentSpeed > 50
+                          ? "Highway speed"
+                          : currentSpeed > 25
+                          ? "City speed"
+                          : "Slow or stationary"}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* ETA countdown widget */}
+                  {etaCountdown && ["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
+                    <Card className="p-5 border-border bg-primary/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                          ETA Countdown
+                        </h3>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {etaCountdown.hours > 0
+                          ? `${etaCountdown.hours}h ${etaCountdown.minutes}m`
+                          : `${etaCountdown.minutes}m`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Arrives by {etaTime?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </p>
+                    </Card>
+                  )}
                 </div>
               </div>
 

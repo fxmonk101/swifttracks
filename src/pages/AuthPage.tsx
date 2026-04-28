@@ -10,6 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
+import { supabase } from "@/integrations/supabase/client";
+
+// Admin account email
+const ADMIN_EMAIL = "warrenharry01@gmail.com";
 
 const AuthPage = () => {
   const { t } = useTranslation();
@@ -38,6 +42,26 @@ const AuthPage = () => {
         toast({ title: t("auth.signUpError"), description: error.message, variant: "destructive" });
       } else {
         toast({ title: t("auth.signUpSuccess") });
+        
+        // Check if this is admin email and assign admin role
+        if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          try {
+            // Get the newly created user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { error: roleError } = await supabase.rpc("set_admin_role", {
+                p_user_id: user.id,
+              });
+              if (roleError) {
+                console.error("Error setting admin role:", roleError);
+              } else {
+                toast({ title: "Admin role assigned", description: "You now have admin access" });
+              }
+            }
+          } catch (err) {
+            console.error("Error assigning admin role:", err);
+          }
+        }
       }
     } else {
       const { error } = await signIn(email, password);

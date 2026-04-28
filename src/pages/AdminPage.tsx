@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Package,
@@ -103,6 +103,11 @@ const AdminPage = () => {
     current: Coordinates;
   } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [simulatingShipment, setSimulatingShipment] = useState<DBShipment | null>(null);
+  const [simulationProgress, setSimulationProgress] = useState(0);
+  const [simulationSpeed, setSimulationSpeed] = useState(1);
+  const [simulationRunning, setSimulationRunning] = useState(false);
+  const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
@@ -129,6 +134,7 @@ const AdminPage = () => {
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
+      if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
     };
   }, [user]);
 
@@ -204,6 +210,68 @@ const AdminPage = () => {
     setGpsLat(String(g.lat));
     setGpsLng(String(g.lng));
     toast({ title: "Coordinates set", description: `${g.lat.toFixed(4)}, ${g.lng.toFixed(4)}` });
+  };
+
+  const handleSimulateTrip = async (targetShipment?: DBShipment) => {
+    const shipment = targetShipment || simulatingShipment || gpsShipment;
+    if (!shipment) return;
+    if (shipment.status !== "IN_TRANSIT") {
+      toast({ title: "Cannot simulate", description: "Shipment must be IN_TRANSIT to simulate", variant: "destructive" });
+      return;
+    }
+
+    setSimulationRunning(true);
+    setSimulationProgress(0);
+    let currentProgress = 0;
+    const stepSize = 5; // 5% per step
+    const baseDelay = 1000; // 1 second base delay
+    const delay = Math.max(100, baseDelay / simulationSpeed);
+
+    const runSimulation = async () => {
+      if (currentProgress >= 100) {
+        // Simulation complete
+        setSimulationRunning(false);
+        if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
+        toast({
+          title: "Trip Completed!",
+          description: "Truck has reached the destination. Status will update to OUT_FOR_DELIVERY.",
+        });
+        // Update status to OUT_FOR_DELIVERY
+        const { error } = await supabase.rpc("update_shipment_status", {
+          p_shipment_id: shipment.id,
+          p_new_status: "OUT_FOR_DELIVERY",
+          p_description: "Arrived at destination facility, out for delivery",
+          p_location: `${shipment.receiver_city}, ${shipment.receiver_state}`,
+        });
+        if (error) console.error("Error updating status:", error);
+        fetchShipments();
+        return;
+      }
+
+      // Call RPC to update GPS
+      const { data, error } = await supabase.rpc("simulate_trip_step", {
+        p_shipment_id: shipment.id,
+        p_step: currentProgress,
+      });
+
+      if (error) {
+        toast({ title: "Simulation error", description: error.message, variant: "destructive" });
+        setSimulationRunning(false);
+        if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
+        return;
+      }
+
+      currentProgress = Math.min(100, currentProgress + stepSize);
+      setSimulationProgress(currentProgress);
+    };
+
+    simulationIntervalRef.current = setInterval(runSimulation, delay);
+  };
+
+  const handleStopSimulation = () => {
+    if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
+    setSimulationRunning(false);
+    setSimulationProgress(0);
   };
 
   const stats = [
@@ -743,6 +811,55 @@ const AdminPage = () => {
                   "Update GPS"
                 )}
               </Button>
+              {gpsShipment?.status === "IN_TRANSIT" && (
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="text-xs font-semibold">Simulate Trip</h4>
+                  <p className="text-[11px] text-muted-foreground">Auto-move truck along route from origin to destination</p>
+                  <div>
+                    <Label className="text-xs">Simulation Speed</Label>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3"
+                        step="0.5"
+                        value={simulationSpeed}
+                        onChange={(e) => setSimulationSpeed(parseFloat(e.target.value))}
+                        disabled={simulationRunning}
+                        className="flex-1 h-2 rounded cursor-pointer"
+                      />
+                      <span className="text-xs font-mono w-12 text-right">{simulationSpeed}x</span>
+                    </div>
+                  </div>
+                  {simulationRunning && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">Progress</span>
+                        <span className="text-xs font-mono">{simulationProgress.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-muted rounded overflow-hidden">
+                        <div
+                          className="h-full bg-secondary transition-all duration-300"
+                          style={{ width: `${simulationProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    onClick={simulationRunning ? handleStopSimulation : () => handleSimulateTrip(gpsShipment || undefined)}
+                    className="w-full"
+                    variant={simulationRunning ? "destructive" : "default"}
+                  >
+                    {simulationRunning ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Stop Simulation
+                      </>
+                    ) : (
+                      <>▶ Start Simulation</>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
