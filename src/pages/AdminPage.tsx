@@ -13,6 +13,7 @@ import {
   Loader2,
   Navigation,
   Map,
+  QrCode,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { geocode, US_CENTER } from "@/lib/geocoding";
 import TrackingMap from "@/components/TrackingMap";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import { Coordinates } from "@/lib/types";
 
 const statusClass: Record<string, string> = {
@@ -76,13 +78,21 @@ function generateTrackingId() {
 
 const AdminPage = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [shipments, setShipments] = useState<DBShipment[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Authentication guard - redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
   const [creating, setCreating] = useState(false);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [editingShipment, setEditingShipment] = useState<DBShipment | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [statusDescription, setStatusDescription] = useState("");
@@ -569,6 +579,15 @@ const AdminPage = () => {
               className="pl-10 font-mono text-sm"
             />
           </div>
+          <Button
+            onClick={() => setBarcodeScannerOpen(true)}
+            variant="outline"
+            size="icon"
+            title="Scan shipment barcode"
+            className="hover:bg-blue-50 dark:hover:bg-blue-950"
+          >
+            <QrCode className="h-4 w-4" />
+          </Button>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="All statuses" />
@@ -899,6 +918,20 @@ const AdminPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Barcode Scanner Dialog */}
+      <BarcodeScanner
+        isOpen={barcodeScannerOpen}
+        onOpenChange={setBarcodeScannerOpen}
+        onScan={(barcode) => {
+          setSearchQuery(barcode);
+          setBarcodeScannerOpen(false);
+          toast({
+            title: "Barcode Scanned",
+            description: `Searching for shipment: ${barcode}`,
+          });
+        }}
+      />
     </div>
   );
 };

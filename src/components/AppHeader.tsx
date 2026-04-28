@@ -48,10 +48,8 @@ const AppHeader = () => {
       <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="container flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
-              <Package className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-black tracking-wide text-foreground">
+            <img src="/logo.png" alt="SwiftTrack Logo" className="h-10 w-10 object-contain" />
+            <span className="font-display text-xl font-black tracking-wide text-foreground">
               SWIFT<span className="text-primary">TRACK</span>
             </span>
           </Link>
