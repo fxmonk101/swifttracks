@@ -1,23 +1,10 @@
 import { Shipment, Driver, Coordinates } from "./types";
 
-// Generate smooth route with many intermediate points for better animation
 const routePoints: Coordinates[] = [
-  // NYC to Philadelphia
   { lat: 40.7128, lng: -74.006 },   // NYC
-  { lat: 40.6501, lng: -73.9496 },  // Brooklyn
-  { lat: 40.5524, lng: -73.9776 },  // Queens
-  { lat: 40.4774, lng: -74.2591 },  // New Jersey
-  { lat: 40.3574, lng: -74.5185 },  // Princeton area
   { lat: 40.2206, lng: -74.7642 },  // Trenton
-  { lat: 40.0331, lng: -74.8852 },  // Levittown
   { lat: 39.9526, lng: -75.1652 },  // Philadelphia
-  // Philadelphia to Baltimore
-  { lat: 39.8938, lng: -75.3589 },  // Chester
-  { lat: 39.8290, lng: -75.7586 },  // Wilmington
-  { lat: 39.5501, lng: -75.9246 },  // Maryland border
   { lat: 39.2904, lng: -76.6122 },  // Baltimore
-  // Baltimore to Washington DC
-  { lat: 39.1131, lng: -76.8670 },  // Laurel
   { lat: 38.9072, lng: -77.0369 },  // Washington DC
 ];
 

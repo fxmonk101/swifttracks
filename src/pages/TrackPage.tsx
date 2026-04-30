@@ -15,7 +15,6 @@ import {
   CircleCheck,
   Clock,
   AlertCircle,
-  QrCode,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TrackingMap from "@/components/TrackingMap";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
-import BarcodeScanner from "@/components/BarcodeScanner";
 import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
 import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
@@ -147,7 +145,6 @@ const TrackPage = () => {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
 
   const [dbShipment, setDbShipment] = useState<DBShipment | null>(null);
   const [dbEvents, setDbEvents] = useState<DBEvent[]>([]);
@@ -226,20 +223,15 @@ const TrackPage = () => {
         await loadEvents(shipment.id);
         await loadSnapshots(shipment.id);
 
-        // Set up real-time subscription with all events
         channel = supabase
-          .channel(`shipment-${shipment.id}`, {
-            config: { broadcast: { self: true }, presence: { key: shipment.id } },
-          })
+          .channel(`shipment-${shipment.id}`)
           .on(
             "postgres_changes",
             { event: "UPDATE", schema: "public", table: "shipments", filter: `id=eq.${shipment.id}` },
             (payload) => {
-              console.log("[TrackPage] Shipment UPDATE received:", payload);
               const n = payload.new as DBShipment;
               const o = (payload as { old?: Partial<DBShipment> }).old;
               setDbShipment(n);
-              
               if (o && n.status !== o.status) {
                 toast({
                   title: "Shipment updated",
@@ -251,29 +243,22 @@ const TrackPage = () => {
                   p_event_type: "status_change",
                 }).catch(err => console.error("Error queueing notification:", err));
               }
-              
-              // Check if location changed - handle both cases (o exists or not)
               const latChanged =
-                (!o || `${n.current_lat}` !== `${o.current_lat}` || `${n.current_lng}` !== `${o.current_lng}`);
-              
-              if (latChanged) {
-                console.log("[TrackPage] Location changed, reloading snapshots");
-                // Check for large jumps (> 25km) that require map refit
-                if (o) {
-                  const prevLat = num(o.current_lat, NaN);
-                  const prevLng = num(o.current_lng, NaN);
-                  const curLat = num(n.current_lat, NaN);
-                  const curLng = num(n.current_lng, NaN);
-                  if (
-                    Number.isFinite(prevLat) &&
-                    Number.isFinite(prevLng) &&
-                    Number.isFinite(curLat) &&
-                    Number.isFinite(curLng)
-                  ) {
-                    if (haversineMeters({ lat: prevLat, lng: prevLng }, { lat: curLat, lng: curLng }) > 25000) {
-                      console.log("[TrackPage] Large location jump detected, refitting map");
-                      setMapFitNonce((x) => x + 1);
-                    }
+                o &&
+                (`${n.current_lat}` !== `${o.current_lat}` || `${n.current_lng}` !== `${o.current_lng}`);
+              if (latChanged && o) {
+                const prevLat = num(o.current_lat, NaN);
+                const prevLng = num(o.current_lng, NaN);
+                const curLat = num(n.current_lat, NaN);
+                const curLng = num(n.current_lng, NaN);
+                if (
+                  Number.isFinite(prevLat) &&
+                  Number.isFinite(prevLng) &&
+                  Number.isFinite(curLat) &&
+                  Number.isFinite(curLng)
+                ) {
+                  if (haversineMeters({ lat: prevLat, lng: prevLng }, { lat: curLat, lng: curLng }) > 25000) {
+                    setMapFitNonce((x) => x + 1);
                   }
                 }
                 void loadSnapshots(shipment.id);
@@ -283,10 +268,7 @@ const TrackPage = () => {
           .on(
             "postgres_changes",
             { event: "INSERT", schema: "public", table: "shipment_events", filter: `shipment_id=eq.${shipment.id}` },
-            () => {
-              console.log("[TrackPage] New shipment event");
-              return loadEvents(shipment.id);
-            }
+            () => loadEvents(shipment.id)
           )
           .on(
             "postgres_changes",
@@ -296,14 +278,9 @@ const TrackPage = () => {
               table: "shipment_location_snapshots",
               filter: `shipment_id=eq.${shipment.id}`,
             },
-            (payload) => {
-              console.log("[TrackPage] New location snapshot:", payload);
-              return loadSnapshots(shipment.id);
-            }
+            () => loadSnapshots(shipment.id)
           )
-          .subscribe((status) => {
-            console.log("[TrackPage] Subscription status:", status);
-          });
+          .subscribe();
       } else {
         setDbShipment(null);
         setDbEvents([]);
@@ -313,7 +290,6 @@ const TrackPage = () => {
     })();
 
     return () => {
-      console.log("[TrackPage] Cleaning up subscription for shipment");
       if (channel) supabase.removeChannel(channel);
     };
   }, [id]);
@@ -473,16 +449,6 @@ const TrackPage = () => {
     navigate(`/track/${input.trim()}`);
   };
 
-  const handleBarcodeScan = (barcode: string) => {
-    setInput(barcode);
-    setError("");
-    navigate(`/track/${barcode.trim()}`);
-    toast({
-      title: "Barcode Scanned",
-      description: `Tracking shipment: ${barcode}`,
-    });
-  };
-
   useEffect(() => {
     if (id && !loading && !dbShipment && !mockShipment) {
       setError("Shipment not found. Check the tracking ID and try again.");
@@ -565,21 +531,8 @@ const TrackPage = () => {
                   className="pl-10 bg-white/10 border-white/20 text-secondary-foreground placeholder:text-secondary-foreground/40 font-mono text-sm h-12"
                 />
               </div>
-              <Button 
-                onClick={handleSearch} 
-                size="lg" 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-display font-bold tracking-wide px-8"
-              >
+              <Button onClick={handleSearch} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-display font-bold tracking-wide px-8">
                 <Search className="h-4 w-4 mr-2" /> TRACK
-              </Button>
-              <Button 
-                onClick={() => setBarcodeScannerOpen(true)} 
-                size="lg" 
-                variant="outline"
-                className="bg-white/10 border-white/20 hover:bg-white/20 text-secondary-foreground font-display font-bold"
-                title="Scan barcode or QR code"
-              >
-                <QrCode className="h-4 w-4" />
               </Button>
             </div>
             {error && (
@@ -613,232 +566,298 @@ const TrackPage = () => {
           </div>
         )}
 
-        {/* Tracking results — Enhanced Fleet-style layout with sidebar */}
+        {/* Tracking results — USPS-style layout */}
         {shipment && !loading && (
-          <div className="flex-1 flex flex-col">
-            {/* Top info bar */}
-            <div className="border-b border-border bg-card px-4 py-3 md:px-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Tracking Number</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <h2 className="font-mono text-lg font-bold text-foreground">{shipment.trackingId}</h2>
-                    <button onClick={copyTracking} className="text-muted-foreground hover:text-foreground transition-colors">
-                      {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-                    </button>
+          <div className="flex-1">
+            <div className="container py-6 space-y-5">
+              {/* === Header card: tracking number + status banner === */}
+              <Card className="overflow-hidden border-border">
+                <div className="p-5 border-b border-border bg-card flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Tracking Number</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <h2 className="font-mono text-xl font-bold text-foreground">{shipment.trackingId}</h2>
+                      <button onClick={copyTracking} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Service: <span className="font-semibold text-foreground">{shipment.serviceType}</span>
+                      {shipment.requiresSignature && (
+                        <span className="ml-3 inline-flex items-center gap-1 text-accent">
+                          <Shield className="h-3 w-3" /> Signature required
+                        </span>
+                      )}
+                    </p>
                   </div>
-                </div>
-                <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
-                  {STATUS_LABELS[shipment.status]}
-                </Badge>
-              </div>
-            </div>
-
-            {/* Main content: sidebar + map + right panel */}
-            <div className="flex-1 flex overflow-hidden">
-              {/* Left sidebar */}
-              <div className="w-72 border-r border-border bg-card overflow-y-auto hidden md:flex flex-col">
-                <div className="p-4 border-b border-border">
-                  <h3 className="font-display text-sm font-bold text-foreground mb-2">Shipment Status</h3>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    {isDelivered 
-                      ? "Package delivered successfully." 
-                      : isException 
-                      ? "Delivery issue reported." 
-                      : "Package is in transit."}
-                  </p>
+                  <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
+                    {STATUS_LABELS[shipment.status]}
+                  </Badge>
                 </div>
 
-                {/* Status block */}
-                <div className="p-4 border-b border-border">
-                  <div className={`p-3 rounded-lg ${
+                {/* Hero status block */}
+                <div
+                  className={`px-5 py-6 ${
                     isDelivered
-                      ? "bg-success/10 border border-success/30"
+                      ? "bg-success/10 border-l-4 border-success"
                       : isException
-                      ? "bg-destructive/10 border border-destructive/30"
-                      : "bg-secondary/10 border border-secondary/30"
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {isDelivered ? <CircleCheck className="h-4 w-4 text-success" /> : isException ? <AlertCircle className="h-4 w-4 text-destructive" /> : <Truck className="h-4 w-4 text-secondary" />}
-                      <span className="text-xs font-semibold">
-                        {isDelivered ? "Delivered" : isException ? "Issue" : STATUS_LABELS[shipment.status]}
-                      </span>
+                      ? "bg-destructive/10 border-l-4 border-destructive"
+                      : "bg-secondary/5 border-l-4 border-secondary"
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        isDelivered ? "bg-success text-success-foreground" : isException ? "bg-destructive text-destructive-foreground" : "bg-secondary text-secondary-foreground"
+                      }`}
+                    >
+                      {isDelivered ? <CircleCheck className="h-6 w-6" /> : isException ? <AlertCircle className="h-6 w-6" /> : <Truck className="h-6 w-6" />}
                     </div>
-                    {hasGps && (
-                      <p className="text-[10px] font-mono text-muted-foreground">
-                        {num(shipment?.currentLocation?.lat).toFixed(4)}, {num(shipment?.currentLocation?.lng).toFixed(4)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Route info */}
-                <div className="p-4 border-b border-border space-y-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">From</p>
-                    <p className="text-xs font-semibold text-foreground">{shipment.sender.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{shipment.sender.city}, {shipment.sender.state}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">To</p>
-                    <p className="text-xs font-semibold text-foreground">{shipment.receiver.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{shipment.receiver.city}, {shipment.receiver.state}</p>
-                  </div>
-                </div>
-
-                {/* Service details */}
-                <div className="p-4 border-b border-border space-y-2">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Service</p>
-                    <p className="text-xs font-semibold text-foreground">{shipment.serviceType}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Expected Delivery</p>
-                    <p className="text-xs font-semibold text-foreground">{formatDate(shipment.estimatedDeliveryDate)}</p>
-                  </div>
-                  {shipment.requiresSignature && (
-                    <div className="flex items-center gap-1.5 text-accent text-xs pt-1">
-                      <Shield className="h-3 w-3" /> Signature required
+                    <div className="flex-1">
+                      <h3 className="font-display text-xl font-bold text-foreground mb-1">
+                        {isDelivered ? "Delivered" : isException ? "Delivery Issue" : STATUS_LABELS[shipment.status]}
+                      </h3>
+                      {isDelivered && shipment.actualDeliveryDate ? (
+                        <p className="text-sm text-muted-foreground">
+                          Delivered on <span className="font-semibold text-foreground">{formatDateTime(shipment.actualDeliveryDate)}</span>
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">Expected delivery:</span>{" "}
+                            {formatDate(shipment.estimatedDeliveryDate)}
+                          </p>
+                          {shipment.events.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Last update: {shipment.events[shipment.events.length - 1].description} —{" "}
+                              {formatDateTime(shipment.events[shipment.events.length - 1].timestamp)}
+                            </p>
+                          )}
+                        </>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Progress */}
-                <div className="p-4 flex-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Progress</p>
+                {/* Progress bar */}
+                <div className="px-5 py-5 bg-card">
                   <TrackingProgressBar currentStatus={shipment.status} />
                 </div>
-              </div>
+              </Card>
 
-              {/* Center: Map */}
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-display text-sm font-bold text-foreground">Live Tracking Map</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {hasGps ? "Real-time GPS location" : geoLoading ? "Locating addresses…" : "Showing route"}
-                    </p>
-                  </div>
-                  {hasGps && (
-                    <Badge className="bg-success/10 text-success border-success/30 text-[10px] font-mono flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5 animate-pulse" />
-                      LIVE
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex-1 relative">
-                  {canShowMap ? (
-                    <TrackingMap
-                      routeHistory={mapRouteHistory}
-                      currentLocation={currentLoc}
-                      destination={destination}
-                      origin={origin}
-                      followTruck={followTruck}
-                      onFollowTruckChange={setFollowTruck}
-                      stationaryAtHold={stationaryAtHold}
-                      mapFitNonce={mapFitNonce}
-                      trackingIdForFit={shipment.trackingId}
-                      shareTrackingUrl={shareUrl}
-                    />
-                  ) : (
-                    <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                      Loading map…
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Right sidebar: Additional info */}
-              <div className="w-80 border-l border-border bg-card overflow-y-auto hidden lg:flex flex-col">
-                <div className="p-4 border-b border-border space-y-3">
-                  <h3 className="font-display text-sm font-bold text-foreground">Package Information</h3>
-                  
-                  <div className="space-y-2 text-xs">
-                    <div>
-                      <p className="text-muted-foreground uppercase tracking-wider font-semibold">Weight</p>
-                      <p className="font-semibold text-foreground">{shipment.weight || "—"} kg</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground uppercase tracking-wider font-semibold">Dimensions</p>
-                      <p className="font-semibold text-foreground">
-                        {shipment.dimensions.length || "—"} × {shipment.dimensions.width || "—"} × {shipment.dimensions.height || "—"} cm
+              {/* === Map + sidebar === */}
+              <div className="grid lg:grid-cols-3 gap-5">
+                <Card className="lg:col-span-2 overflow-hidden border-border">
+                  <div className="px-5 py-3 border-b border-border bg-card flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-display text-sm font-bold text-foreground">Live Map</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {hasGps ? "Real-time GPS location" : geoLoading ? "Locating addresses…" : "Showing route"}
                       </p>
+                      {hasGps && (
+                        <p className="text-[10px] font-mono text-muted-foreground mt-1 truncate" title="Current coordinates">
+                          {num(isDB && dbShipment ? dbShipment.current_lat : shipment?.currentLocation?.lat).toFixed(5)}
+                          ,{" "}
+                          {num(isDB && dbShipment ? dbShipment.current_lng : shipment?.currentLocation?.lng).toFixed(5)}
+                        </p>
+                      )}
                     </div>
+                    {hasGps && (
+                      <Badge className="bg-success/10 text-success border-success/30 text-[10px] font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5 animate-pulse" />
+                        LIVE
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="h-[420px] relative">
+                    {canShowMap ? (
+                      <TrackingMap
+                        routeHistory={mapRouteHistory}
+                        currentLocation={currentLoc}
+                        destination={destination}
+                        origin={origin}
+                        followTruck={followTruck}
+                        onFollowTruckChange={setFollowTruck}
+                        stationaryAtHold={stationaryAtHold}
+                        mapFitNonce={mapFitNonce}
+                        trackingIdForFit={shipment.trackingId}
+                        shareTrackingUrl={shareUrl}
+                      />
+                    ) : (
+                      <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        Loading map…
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+                {/* Right sidebar: addresses */}
+                <div className="space-y-5">
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-secondary/10 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-secondary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Shipped From
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{shipment.sender.name}</p>
+                    {shipment.sender.street && (
+                      <p className="text-xs text-muted-foreground mt-1">{shipment.sender.street}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {shipment.sender.city}, {shipment.sender.state} {shipment.sender.zip}
+                    </p>
+                  </Card>
+
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Delivering To
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground">{shipment.receiver.name}</p>
+                    {shipment.receiver.street && (
+                      <p className="text-xs text-muted-foreground mt-1">{shipment.receiver.street}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {shipment.receiver.city}, {shipment.receiver.state} {shipment.receiver.zip}
+                    </p>
+                  </Card>
+
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Expected Delivery
+                      </h3>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">{formatDate(shipment.estimatedDeliveryDate)}</p>
+                  </Card>
+
+                  {/* Speed widget */}
+                  {["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
+                    <Card className="p-5 border-border bg-secondary/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Truck className="h-4 w-4 text-secondary" />
+                        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                          Current Speed
+                        </h3>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {currentSpeed !== null ? `${currentSpeed.toFixed(0)} mph` : "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {currentSpeed === null
+                          ? "Calculating from GPS history..."
+                          : currentSpeed > 50
+                          ? "Highway speed"
+                          : currentSpeed > 25
+                          ? "City speed"
+                          : "Slow or stationary"}
+                      </p>
+                    </Card>
+                  )}
+
+                  {/* ETA countdown widget */}
+                  {etaCountdown && ["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
+                    <Card className="p-5 border-border bg-primary/5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="h-4 w-4 text-primary" />
+                        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                          ETA Countdown
+                        </h3>
+                      </div>
+                      <p className="text-lg font-bold text-foreground">
+                        {etaCountdown.hours > 0
+                          ? `${etaCountdown.hours}h ${etaCountdown.minutes}m`
+                          : `${etaCountdown.minutes}m`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Arrives by {etaTime?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </p>
+                    </Card>
+                  )}
+                </div>
+              </div>
+
+              {/* === Package details === */}
+              <Card className="border-border">
+                <div className="px-5 py-3 border-b border-border bg-card">
+                  <h3 className="font-display text-sm font-bold text-foreground">Package Details</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-0 divide-x divide-border">
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Weight className="h-3 w-3" /> Weight
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.weight || "—"} kg</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Box className="h-3 w-3" /> Dimensions
+                    </div>
+                    <p className="text-sm font-semibold">
+                      {shipment.dimensions.length}×{shipment.dimensions.width}×{shipment.dimensions.height} cm
+                    </p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Truck className="h-3 w-3" /> Service
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.serviceType}</p>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                      <Shield className="h-3 w-3" /> Signature
+                    </div>
+                    <p className="text-sm font-semibold">{shipment.requiresSignature ? "Required" : "Not required"}</p>
                   </div>
                 </div>
+              </Card>
 
-                {/* Speed widget */}
-                {["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
-                  <div className="p-4 border-b border-border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Truck className="h-4 w-4 text-secondary" />
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Current Speed</h4>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">
-                      {currentSpeed !== null ? `${currentSpeed.toFixed(0)} mph` : "—"}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {currentSpeed === null
-                        ? "Calculating…"
-                        : currentSpeed > 50
-                        ? "Highway speed"
-                        : currentSpeed > 25
-                        ? "City speed"
-                        : "Slow/stationary"}
-                    </p>
-                  </div>
-                )}
-
-                {/* ETA countdown widget */}
-                {etaCountdown && ["IN_TRANSIT", "OUT_FOR_DELIVERY"].includes(shipment.status) && (
-                  <div className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-primary" />
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">ETA</h4>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">
-                      {etaCountdown.hours > 0
-                        ? `${etaCountdown.hours}h ${etaCountdown.minutes}m`
-                        : `${etaCountdown.minutes}m`}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Arrives by {etaTime?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom: Tracking history when on mobile */}
-            <div className="md:hidden border-t border-border bg-card">
-              <div className="container py-6">
-                <h3 className="font-display text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+              {/* === Tracking history (USPS-style table) === */}
+              <Card className="border-border overflow-hidden">
+                <div className="px-5 py-3 border-b border-border bg-card flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  Tracking History
+                  <h3 className="font-display text-sm font-bold text-foreground">Tracking History</h3>
                   <span className="text-xs text-muted-foreground">({shipment.events.length} updates)</span>
-                </h3>
+                </div>
                 {shipment.events.length === 0 ? (
-                  <div className="text-center text-sm text-muted-foreground py-8">No tracking updates yet.</div>
+                  <div className="p-8 text-center text-sm text-muted-foreground">No tracking updates yet.</div>
                 ) : (
-                  <div className="space-y-3">
-                    {[...shipment.events].reverse().slice(0, 5).map((e, i) => (
-                      <div key={`${e.timestamp}-${i}`} className="pb-3 border-b border-border/50 last:border-0">
-                        <div className="text-xs text-muted-foreground mb-1">{formatDateTime(e.timestamp)}</div>
-                        <Badge className={`${statusClass[e.status] || "bg-muted text-muted-foreground"} text-[10px] font-mono border mb-1`}>
-                          {STATUS_LABELS[e.status as ShipmentStatus] || e.status}
-                        </Badge>
-                        <p className="text-sm text-foreground">{e.description}</p>
-                        {e.location && (
-                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {e.location}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                  <div className="divide-y divide-border">
+                    {[...shipment.events].reverse().map((e, i) => {
+                      const isLatest = i === 0;
+                      return (
+                        <div
+                          key={`${e.timestamp}-${i}`}
+                          className={`grid grid-cols-12 gap-3 px-5 py-4 ${isLatest ? "bg-secondary/5" : ""}`}
+                        >
+                          <div className="col-span-12 md:col-span-3 text-xs text-muted-foreground">
+                            {formatDateTime(e.timestamp)}
+                          </div>
+                          <div className="col-span-12 md:col-span-3">
+                            <Badge className={`${statusClass[e.status] || "bg-muted text-muted-foreground"} text-[10px] font-mono border`}>
+                              {STATUS_LABELS[e.status as ShipmentStatus] || e.status}
+                            </Badge>
+                          </div>
+                          <div className="col-span-12 md:col-span-4 text-sm text-foreground">{e.description}</div>
+                          <div className="col-span-12 md:col-span-2 text-xs text-muted-foreground flex items-center gap-1">
+                            {e.location && <MapPin className="h-3 w-3" />}
+                            {e.location}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-              </div>
+              </Card>
             </div>
 
             <Footer />
@@ -846,13 +865,6 @@ const TrackPage = () => {
         )}
 
         {!shipment && !loading && <Footer />}
-
-        {/* Barcode Scanner Dialog */}
-        <BarcodeScanner
-          isOpen={barcodeScannerOpen}
-          onOpenChange={setBarcodeScannerOpen}
-          onScan={handleBarcodeScan}
-        />
       </div>
     </PageTransition>
   );

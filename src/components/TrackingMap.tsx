@@ -43,11 +43,7 @@ const useAnimatedPosition = (target: Coordinates, durationMs: number) => {
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // Update the from position if we're not in the middle of animation
-    if (fromRef.current.lat !== target.lat || fromRef.current.lng !== target.lng) {
-      // Location changed
-    } else {
-      // Already at target
+    if (fromRef.current.lat === target.lat && fromRef.current.lng === target.lng) {
       setPos(target);
       return;
     }
@@ -299,14 +295,14 @@ const TrackingMap = ({
     <MapErrorBoundary>
       <div ref={mapWrapRef} className="relative h-full w-full">
         {showMapControls && (
-          <div className="absolute top-3 left-3 right-3 z-[500] flex flex-wrap items-center gap-2.5 pointer-events-none">
-            <div className="pointer-events-auto flex flex-wrap items-center gap-2.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-lg p-2 shadow-lg border border-white/20 dark:border-slate-800/20">
+          <div className="absolute top-2 left-2 right-2 z-[500] flex flex-wrap items-center gap-2 pointer-events-none">
+            <div className="pointer-events-auto flex flex-wrap items-center gap-2">
               <Select value={basemap} onValueChange={(v) => setBasemap(v as BasemapId)}>
-                <SelectTrigger className="h-9 w-[130px] text-xs font-medium bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                  <SelectValue placeholder="Map Layer" />
+                <SelectTrigger className="h-8 w-[140px] text-xs bg-card/95 backdrop-blur border-border shadow-sm">
+                  <SelectValue placeholder="Map" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="road">Road Map</SelectItem>
+                  <SelectItem value="road">Road map</SelectItem>
                   <SelectItem value="terrain">Terrain</SelectItem>
                   <SelectItem value="streets">Streets</SelectItem>
                   <SelectItem value="satellite">Satellite</SelectItem>
@@ -314,51 +310,47 @@ const TrackingMap = ({
               </Select>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
-                className="h-9 text-xs font-medium gap-1.5 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
                 onClick={() => setManualFitNonce((n) => n + 1)}
-                title="Re-center the map to show all stops"
               >
-                <Crosshair className="h-4 w-4" />
+                <Crosshair className="h-3.5 w-3.5" />
                 Recenter
               </Button>
               {onFollowTruckChange && (
                 <Button
                   type="button"
-                  variant={followTruck ? "default" : "outline"}
+                  variant={followTruck ? "default" : "secondary"}
                   size="sm"
-                  className="h-9 text-xs font-medium gap-1.5 transition-colors"
+                  className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
                   onClick={() => onFollowTruckChange(!followTruck)}
                   aria-pressed={followTruck}
-                  title={followTruck ? "Stop following truck" : "Follow truck movement"}
                 >
-                  <MapPinned className="h-4 w-4" />
+                  <MapPinned className="h-3.5 w-3.5" />
                   Follow
                 </Button>
               )}
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
-                className="h-9 text-xs font-medium gap-1.5 hover:bg-green-50 dark:hover:bg-green-950 transition-colors"
+                className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
                 onClick={handleFullscreen}
-                title="Expand map to fullscreen"
+                title="Fullscreen"
               >
-                <Maximize2 className="h-4 w-4" />
-                Expand
+                <Maximize2 className="h-3.5 w-3.5" />
               </Button>
               {shareTrackingUrl && (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  className="h-9 text-xs font-medium gap-1.5 hover:bg-purple-50 dark:hover:bg-purple-950 transition-colors"
+                  className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
                   onClick={handleShare}
-                  title="Copy tracking link to clipboard"
+                  title="Copy tracking link"
                 >
-                  <Share2 className="h-4 w-4" />
-                  Share
+                  <Share2 className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
