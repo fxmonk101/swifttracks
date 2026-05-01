@@ -245,6 +245,11 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      queue_delivery_notification: {
+        Args: { p_event_type: string; p_shipment_id: string }
+        Returns: Json
+      }
+      set_admin_role: { Args: { p_user_id: string }; Returns: Json }
       simulate_trip_step: {
         Args: {
           p_dest_lat: number
