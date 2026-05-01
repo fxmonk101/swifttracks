@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TrackingMap from "@/components/TrackingMap";
+import Barcode from "@/components/Barcode";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
 import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
 import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
@@ -119,7 +120,8 @@ async function calculateSpeedAndETA(
       return { speed: null, eta: null };
     }
 
-    const speedMph = data.current_speed_mph || 60;
+    const analytics = (data ?? {}) as { current_speed_mph?: number | null };
+    const speedMph = analytics.current_speed_mph ?? 60;
 
     // Calculate distance to destination using haversine
     const distanceMeters = haversineMeters(currentLocation, destination);
@@ -237,11 +239,15 @@ const TrackPage = () => {
                   title: "Shipment updated",
                   description: `Status: ${STATUS_LABELS[n.status as ShipmentStatus] || n.status}`,
                 });
-                // Queue notification
-                supabase.rpc("queue_delivery_notification", {
-                  p_shipment_id: shipment.id,
-                  p_event_type: "status_change",
-                }).catch(err => console.error("Error queueing notification:", err));
+                // Queue notification (fire & forget)
+                void supabase
+                  .rpc("queue_delivery_notification", {
+                    p_shipment_id: shipment.id,
+                    p_event_type: "status_change",
+                  })
+                  .then(({ error: nerr }) => {
+                    if (nerr) console.error("Error queueing notification:", nerr);
+                  });
               }
               const latChanged =
                 o &&
@@ -590,9 +596,14 @@ const TrackPage = () => {
                       )}
                     </p>
                   </div>
-                  <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
-                    {STATUS_LABELS[shipment.status]}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
+                      {STATUS_LABELS[shipment.status]}
+                    </Badge>
+                    <div className="bg-white rounded p-2 border border-border">
+                      <Barcode value={shipment.trackingId} height={44} width={1.4} />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Hero status block */}

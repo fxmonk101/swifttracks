@@ -89,7 +89,7 @@ export type Database = {
           lat: number
           lng: number
           shipment_id: string
-          source: string
+          source: string | null
         }
         Insert: {
           created_at?: string
@@ -97,7 +97,7 @@ export type Database = {
           lat: number
           lng: number
           shipment_id: string
-          source?: string
+          source?: string | null
         }
         Update: {
           created_at?: string
@@ -105,7 +105,7 @@ export type Database = {
           lat?: number
           lng?: number
           shipment_id?: string
-          source?: string
+          source?: string | null
         }
         Relationships: [
           {
@@ -236,6 +236,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_shipment_analytics: { Args: { p_shipment_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -244,12 +245,29 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
-      submit_driver_location: {
-        Args: { p_lat: number; p_lng: number; p_shipment_id: string }
+      queue_delivery_notification: {
+        Args: { p_event_type: string; p_shipment_id: string }
+        Returns: Json
+      }
+      set_admin_role: { Args: { p_user_id: string }; Returns: Json }
+      simulate_trip_step: {
+        Args: {
+          p_dest_lat: number
+          p_dest_lng: number
+          p_origin_lat: number
+          p_origin_lng: number
+          p_shipment_id: string
+          p_step: number
+        }
         Returns: Json
       }
       update_shipment_location: {
-        Args: { p_lat: number; p_lng: number; p_shipment_id: string; p_source?: string }
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_shipment_id: string
+          p_source?: string
+        }
         Returns: Json
       }
       update_shipment_status: {
