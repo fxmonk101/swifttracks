@@ -119,7 +119,8 @@ async function calculateSpeedAndETA(
       return { speed: null, eta: null };
     }
 
-    const speedMph = data.current_speed_mph || 60;
+    const analytics = (data ?? {}) as { current_speed_mph?: number | null };
+    const speedMph = analytics.current_speed_mph ?? 60;
 
     // Calculate distance to destination using haversine
     const distanceMeters = haversineMeters(currentLocation, destination);
@@ -237,11 +238,15 @@ const TrackPage = () => {
                   title: "Shipment updated",
                   description: `Status: ${STATUS_LABELS[n.status as ShipmentStatus] || n.status}`,
                 });
-                // Queue notification
-                supabase.rpc("queue_delivery_notification", {
-                  p_shipment_id: shipment.id,
-                  p_event_type: "status_change",
-                }).catch(err => console.error("Error queueing notification:", err));
+                // Queue notification (fire & forget)
+                void supabase
+                  .rpc("queue_delivery_notification", {
+                    p_shipment_id: shipment.id,
+                    p_event_type: "status_change",
+                  })
+                  .then(({ error: nerr }) => {
+                    if (nerr) console.error("Error queueing notification:", nerr);
+                  });
               }
               const latChanged =
                 o &&
