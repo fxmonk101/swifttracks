@@ -220,23 +220,31 @@ const AdminPage = () => {
       return;
     }
 
+    // Resolve origin & destination coords
+    const [o, d] = await Promise.all([
+      geocode(`${shipment.sender_city}, ${shipment.sender_state}`),
+      geocode(`${shipment.receiver_city}, ${shipment.receiver_state}`),
+    ]);
+    if (!o || !d) {
+      toast({ title: "Geocode failed", description: "Could not resolve origin or destination", variant: "destructive" });
+      return;
+    }
+
     setSimulationRunning(true);
     setSimulationProgress(0);
     let currentProgress = 0;
-    const stepSize = 5; // 5% per step
-    const baseDelay = 1000; // 1 second base delay
+    const stepSize = 5;
+    const baseDelay = 1000;
     const delay = Math.max(100, baseDelay / simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
-        // Simulation complete
         setSimulationRunning(false);
         if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
         toast({
           title: "Trip Completed!",
           description: "Truck has reached the destination. Status will update to OUT_FOR_DELIVERY.",
         });
-        // Update status to OUT_FOR_DELIVERY
         const { error } = await supabase.rpc("update_shipment_status", {
           p_shipment_id: shipment.id,
           p_new_status: "OUT_FOR_DELIVERY",
@@ -248,10 +256,13 @@ const AdminPage = () => {
         return;
       }
 
-      // Call RPC to update GPS
-      const { data, error } = await supabase.rpc("simulate_trip_step", {
+      const { error } = await supabase.rpc("simulate_trip_step", {
         p_shipment_id: shipment.id,
         p_step: currentProgress,
+        p_origin_lat: o.lat,
+        p_origin_lng: o.lng,
+        p_dest_lat: d.lat,
+        p_dest_lng: d.lng,
       });
 
       if (error) {
