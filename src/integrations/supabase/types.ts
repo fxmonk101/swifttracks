@@ -82,6 +82,41 @@ export type Database = {
           },
         ]
       }
+      shipment_location_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          lat: number
+          lng: number
+          shipment_id: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lat: number
+          lng: number
+          shipment_id: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lat?: number
+          lng?: number
+          shipment_id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipment_location_snapshots_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: false
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shipments: {
         Row: {
           actual_delivery_date: string | null
@@ -201,6 +236,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_shipment_analytics: { Args: { p_shipment_id: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -209,8 +245,24 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      simulate_trip_step: {
+        Args: {
+          p_dest_lat: number
+          p_dest_lng: number
+          p_origin_lat: number
+          p_origin_lng: number
+          p_shipment_id: string
+          p_step: number
+        }
+        Returns: Json
+      }
       update_shipment_location: {
-        Args: { p_lat: number; p_lng: number; p_shipment_id: string }
+        Args: {
+          p_lat: number
+          p_lng: number
+          p_shipment_id: string
+          p_source?: string
+        }
         Returns: Json
       }
       update_shipment_status: {
