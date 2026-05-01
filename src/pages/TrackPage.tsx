@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import TrackingMap from "@/components/TrackingMap";
+import Barcode from "@/components/Barcode";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
 import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
 import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
@@ -595,9 +596,14 @@ const TrackPage = () => {
                       )}
                     </p>
                   </div>
-                  <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
-                    {STATUS_LABELS[shipment.status]}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={`${statusClass[shipment.status]} text-sm font-mono px-4 py-2 border`}>
+                      {STATUS_LABELS[shipment.status]}
+                    </Badge>
+                    <div className="bg-white rounded p-2 border border-border">
+                      <Barcode value={shipment.trackingId} height={44} width={1.4} />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Hero status block */}
