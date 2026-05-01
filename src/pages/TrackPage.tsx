@@ -249,25 +249,21 @@ const TrackPage = () => {
                     if (nerr) console.error("Error queueing notification:", nerr);
                   });
               }
-              const latChanged =
-                o &&
-                (`${n.current_lat}` !== `${o.current_lat}` || `${n.current_lng}` !== `${o.current_lng}`);
-              if (latChanged && o) {
-                const prevLat = num(o.current_lat, NaN);
-                const prevLng = num(o.current_lng, NaN);
-                const curLat = num(n.current_lat, NaN);
-                const curLng = num(n.current_lng, NaN);
-                if (
-                  Number.isFinite(prevLat) &&
-                  Number.isFinite(prevLng) &&
-                  Number.isFinite(curLat) &&
-                  Number.isFinite(curLng)
-                ) {
-                  if (haversineMeters({ lat: prevLat, lng: prevLng }, { lat: curLat, lng: curLng }) > 25000) {
-                    setMapFitNonce((x) => x + 1);
-                  }
-                }
-                void loadSnapshots(shipment.id);
+              // Always refresh trail on any shipment update — `old` is sometimes
+              // missing from realtime payloads, which made the marker look stuck.
+              void loadSnapshots(shipment.id);
+              const prevLat = num(o?.current_lat, NaN);
+              const prevLng = num(o?.current_lng, NaN);
+              const curLat = num(n.current_lat, NaN);
+              const curLng = num(n.current_lng, NaN);
+              if (
+                Number.isFinite(prevLat) &&
+                Number.isFinite(prevLng) &&
+                Number.isFinite(curLat) &&
+                Number.isFinite(curLng) &&
+                haversineMeters({ lat: prevLat, lng: prevLng }, { lat: curLat, lng: curLng }) > 25000
+              ) {
+                setMapFitNonce((x) => x + 1);
               }
             }
           )

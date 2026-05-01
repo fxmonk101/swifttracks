@@ -1,4 +1,4 @@
-import { Component, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Component, forwardRef, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -228,7 +228,7 @@ export interface TrackingMapProps {
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
   !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
 
-const TrackingMap = ({
+const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   routeHistory,
   currentLocation,
   destination,
@@ -241,7 +241,7 @@ const TrackingMap = ({
   trackingIdForFit = "",
   shareTrackingUrl,
   showMapControls = true,
-}: TrackingMapProps) => {
+}, _ref) => {
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
   const safeCurrent = isFiniteCoord(currentLocation) ? currentLocation : safeOrigin;
@@ -412,6 +412,8 @@ const TrackingMap = ({
       </div>
     </MapErrorBoundary>
   );
-};
+});
+
+TrackingMap.displayName = "TrackingMap";
 
 export default TrackingMap;
