@@ -739,6 +739,63 @@ const TrackPage = () => {
 
                 {/* Right sidebar: addresses */}
                 <div className="space-y-5">
+                  <Card className="p-5 border-border bg-secondary/5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-secondary/15 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-secondary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Current Location
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground leading-snug">
+                      {currentLocationText || "Awaiting first scan"}
+                    </p>
+                    {latestEvent?.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{latestEvent.description}</p>
+                    )}
+                    {hasGps && (
+                      <p className="text-[10px] font-mono text-muted-foreground mt-2">
+                        {num(isDB && dbShipment ? dbShipment.current_lat : shipment?.currentLocation?.lat).toFixed(5)},{" "}
+                        {num(isDB && dbShipment ? dbShipment.current_lng : shipment?.currentLocation?.lng).toFixed(5)}
+                      </p>
+                    )}
+                  </Card>
+
+                  {/* GPS Signal & Accuracy */}
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center">
+                        <span className="text-xs">📡</span>
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        GPS Signal
+                      </h3>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{signalLabel}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Accuracy {accuracyMeters !== null ? `±${accuracyMeters} m` : "—"}
+                        </p>
+                      </div>
+                      <div className="flex items-end gap-0.5 h-6" aria-label={`Signal ${signalBars} of 4`}>
+                        {[1, 2, 3, 4].map((i) => (
+                          <span
+                            key={i}
+                            className={`w-1.5 rounded-sm ${
+                              i <= signalBars ? "bg-success" : "bg-muted"
+                            }`}
+                            style={{ height: `${i * 25}%` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      {locationRouteHistory.length} GPS pings recorded
+                    </p>
+                  </Card>
+
                   <Card className="p-5 border-border">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-7 h-7 rounded-full bg-secondary/10 flex items-center justify-center">
