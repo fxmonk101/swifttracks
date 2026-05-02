@@ -1029,6 +1029,7 @@ const AdminPage = () => {
           )}
         </DialogContent>
       </Dialog>
+    </div>
   );
 };
 
