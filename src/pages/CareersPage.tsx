@@ -33,7 +33,7 @@ const CareersPage = () => (
       <Section>
         <div className="text-center mb-12">
           <h2 className="font-display text-4xl font-black text-foreground">OPEN POSITIONS</h2>
-          <p className="text-muted-foreground mt-2">Find your perfect role at SwiftTrack</p>
+          <p className="text-muted-foreground mt-2">Find your perfect role at TransportHaven</p>
         </div>
         <div className="space-y-4 max-w-3xl mx-auto">
           {jobs.map((job) => (
