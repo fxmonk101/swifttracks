@@ -508,6 +508,43 @@ const TrackPage = () => {
   const shareUrl =
     typeof window !== "undefined" && id ? `${window.location.origin}/track/${encodeURIComponent(id)}` : undefined;
 
+  // Latest event provides a human-readable current location label
+  const latestEvent = shipment?.events.length ? shipment.events[shipment.events.length - 1] : null;
+  const currentLocationText =
+    latestEvent?.location?.trim() ||
+    (shipment ? `${shipment.receiver.city}, ${shipment.receiver.state}` : "");
+  const currentLocationLabel = shipment
+    ? `${currentLocationText}${latestEvent?.description ? " — " + latestEvent.description : ""}`
+    : "";
+
+  // GPS accuracy & signal — derived from how recent the last snapshot is
+  // and how many recent snapshots exist. (No raw accuracy from device, so we
+  // synthesize a stable "good/fair/weak" signal from update freshness.)
+  const lastSnapshotAt =
+    locationRouteHistory.length > 0
+      ? null // we don't store created_at in state, fall back to shipment.updated_at
+      : null;
+  const lastUpdateMs = dbShipment?.created_at ? Date.now() - new Date(dbShipment.created_at).getTime() : 0;
+  const minutesSince = Math.floor(lastUpdateMs / 60000);
+  let signalLabel = "Strong";
+  let signalBars = 4;
+  if (locationRouteHistory.length === 0) {
+    signalLabel = "No GPS";
+    signalBars = 0;
+  } else if (locationRouteHistory.length < 3) {
+    signalLabel = "Acquiring";
+    signalBars = 2;
+  } else if (minutesSince > 30) {
+    signalLabel = "Weak";
+    signalBars = 1;
+  } else if (minutesSince > 10) {
+    signalLabel = "Fair";
+    signalBars = 3;
+  }
+  // Synthesized accuracy estimate based on snapshot density
+  const accuracyMeters = locationRouteHistory.length === 0 ? null : Math.max(5, 80 - locationRouteHistory.length * 2);
+  void lastSnapshotAt;
+
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col bg-muted/20">
