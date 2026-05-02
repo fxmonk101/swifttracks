@@ -31,11 +31,11 @@ const AboutPage = () => (
           <div>
             <p className="font-mono text-xs text-primary tracking-widest uppercase mb-2">Our Story</p>
             <h2 className="font-display text-4xl font-black text-foreground mb-4">FROM STARTUP TO<br /><span className="text-primary">INDUSTRY LEADER</span></h2>
-            <p className="text-muted-foreground leading-relaxed mb-4">Founded in 2018, SwiftTrack began with a simple mission: make package delivery transparent and reliable. What started as a small courier service in New York has grown into a nationwide logistics platform serving millions of customers.</p>
+            <p className="text-muted-foreground leading-relaxed mb-4">Founded in 2018, TransportHaven began with a simple mission: make package delivery transparent and reliable. What started as a small courier service in New York has grown into a nationwide logistics platform serving millions of customers.</p>
             <p className="text-muted-foreground leading-relaxed">Today, we operate 15 distribution hubs, employ over 2,000 drivers, and deliver more than 2.5 million packages annually with a 99.8% on-time delivery rate.</p>
           </div>
           <div className="rounded-2xl overflow-hidden shadow-2xl">
-            <img src={teamPhoto} alt="SwiftTrack team" className="w-full h-auto" loading="lazy" width={1200} height={800} />
+            <img src={teamPhoto} alt="TransportHaven team" className="w-full h-auto" loading="lazy" width={1200} height={800} />
           </div>
         </div>
       </Section>
@@ -73,7 +73,7 @@ const AboutPage = () => (
       <Section>
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="rounded-2xl overflow-hidden shadow-2xl">
-            <img src={warehouseImage} alt="SwiftTrack facility" className="w-full h-auto" loading="lazy" width={800} height={600} />
+            <img src={warehouseImage} alt="TransportHaven facility" className="w-full h-auto" loading="lazy" width={800} height={600} />
           </div>
           <div>
             <h2 className="font-display text-4xl font-black text-foreground mb-6">BY THE NUMBERS</h2>

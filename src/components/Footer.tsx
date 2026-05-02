@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Package, Phone, Mail, Clock } from "lucide-react";
+import { Phone, Mail, Clock } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 
 const Footer = () => {
   const { t } = useTranslation();
@@ -10,14 +11,9 @@ const Footer = () => {
       <div className="container py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Package className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="font-display text-xl font-black text-background">
-                SWIFT<span className="text-primary">TRACK</span>
-              </span>
-            </div>
+            <Link to="/" className="inline-flex items-center gap-2 mb-4 bg-background/95 px-3 py-2 rounded-md">
+              <img src={logoImg} alt="TransportHaven" className="h-9 w-auto object-contain" />
+            </Link>
             <p className="text-sm leading-relaxed">{t("footer.tagline")}</p>
           </div>
           <div>
@@ -45,14 +41,14 @@ const Footer = () => {
             <ul className="space-y-2 text-sm">
               <li><Link to="/faq" className="hover:text-background transition-colors">{t("footer.faq")}</Link></li>
               <li><Link to="/reviews" className="hover:text-background transition-colors">{t("footer.reviews")}</Link></li>
-              <li className="flex items-center gap-2"><Phone className="h-3 w-3" /> 1-800-SWIFT-TK</li>
-              <li className="flex items-center gap-2"><Mail className="h-3 w-3" /> support@swifttrack.com</li>
+              <li className="flex items-center gap-2"><Phone className="h-3 w-3" /> 1-800-TRANS-HV</li>
+              <li className="flex items-center gap-2"><Mail className="h-3 w-3" /> support@transporthaven.com</li>
               <li className="flex items-center gap-2"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM</li>
             </ul>
           </div>
         </div>
         <div className="border-t border-background/10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <span className="font-mono text-xs">© 2024 SwiftTrack Logistics. {t("footer.rights")}</span>
+          <span className="font-mono text-xs">© 2026 TransportHaven Logistics. {t("footer.rights")}</span>
           <div className="flex gap-4 text-xs">
             <Link to="/privacy" className="hover:text-background transition-colors">{t("footer.privacy")}</Link>
             <Link to="/terms" className="hover:text-background transition-colors">{t("footer.terms")}</Link>

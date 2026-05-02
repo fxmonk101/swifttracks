@@ -18,8 +18,8 @@ const PrivacyPage = () => (
           { title: "3. Data Sharing", content: "We share information with delivery drivers (limited to what's needed for delivery), payment processors, notification service providers (email and SMS), and law enforcement when legally required. All third-party providers are bound by strict data protection agreements." },
           { title: "4. Data Security", content: "We implement industry-standard security measures including encryption in transit (TLS 1.3), encrypted storage, access controls, and regular security audits. Customer tracking pages display city/state only — never raw email addresses or driver IDs." },
           { title: "5. Data Retention", content: "Shipment records are retained for 7 years for business and legal purposes. GPS location history is automatically deleted after 30 days. Account data is deleted within 30 days of account closure upon request." },
-          { title: "6. Your Rights", content: "You have the right to access, correct, or delete your personal data. You can opt out of marketing communications at any time. California residents have additional rights under CCPA. Contact privacy@swifttrack.com for any data requests." },
-          { title: "7. Contact Us", content: "For privacy questions or concerns, email privacy@swifttrack.com or call 1-800-SWIFT-TK. Our Data Protection Officer can be reached at dpo@swifttrack.com." },
+          { title: "6. Your Rights", content: "You have the right to access, correct, or delete your personal data. You can opt out of marketing communications at any time. California residents have additional rights under CCPA. Contact privacy@transporthaven.com for any data requests." },
+          { title: "7. Contact Us", content: "For privacy questions or concerns, email privacy@transporthaven.com or call 1-800-TRANS-HV. Our Data Protection Officer can be reached at dpo@transporthaven.com." },
         ].map((s) => (
           <div key={s.title} className="mb-8">
             <h2 className="font-display text-xl font-bold text-foreground mb-3">{s.title}</h2>

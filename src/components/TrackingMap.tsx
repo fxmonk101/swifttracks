@@ -223,6 +223,8 @@ export interface TrackingMapProps {
   trackingIdForFit?: string;
   shareTrackingUrl?: string;
   showMapControls?: boolean;
+  /** Human-readable label for the current location popup, e.g. "Memphis, TN — At Facility" */
+  currentLocationLabel?: string;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
@@ -241,6 +243,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   trackingIdForFit = "",
   shareTrackingUrl,
   showMapControls = true,
+  currentLocationLabel,
 }, _ref) => {
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
@@ -255,11 +258,38 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   const [manualFitNonce, setManualFitNonce] = useState(0);
   const mapWrapRef = useRef<HTMLDivElement>(null);
 
-  const allPoints = useMemo(
-    () => [safeOrigin, ...safeHistory, animatedLoc],
-    [safeOrigin, safeHistory, animatedLoc]
-  );
-  const polylinePositions = allPoints.map((p): [number, number] => [p.lat, p.lng]);
+  // Build a clean traveled route: origin -> de-duplicated history -> current.
+  // We collapse points that are within ~300m of each other so the line doesn't
+  // get a jagged "many short segments" look from frequent GPS pings.
+  const traveledRoute = useMemo<[number, number][]>(() => {
+    const raw: Coordinates[] = [safeOrigin, ...safeHistory, animatedLoc];
+    const out: Coordinates[] = [];
+    const MIN_M = 300;
+    for (const p of raw) {
+      if (out.length === 0) {
+        out.push(p);
+        continue;
+      }
+      const last = out[out.length - 1];
+      // crude meter distance
+      const R = 6371008;
+      const dLat = ((p.lat - last.lat) * Math.PI) / 180;
+      const dLng = ((p.lng - last.lng) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((last.lat * Math.PI) / 180) *
+          Math.cos((p.lat * Math.PI) / 180) *
+          Math.sin(dLng / 2) ** 2;
+      const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+      if (dist >= MIN_M) out.push(p);
+    }
+    // ensure last point is current
+    const lastOut = out[out.length - 1];
+    if (lastOut.lat !== animatedLoc.lat || lastOut.lng !== animatedLoc.lng) {
+      out.push(animatedLoc);
+    }
+    return out.map((p): [number, number] => [p.lat, p.lng]);
+  }, [safeOrigin, safeHistory, animatedLoc]);
 
   const remainingRoute: [number, number][] = [
     [animatedLoc.lat, animatedLoc.lng],
@@ -291,6 +321,11 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
       .catch(() => toast({ title: "Copy failed", description: "Could not access the clipboard.", variant: "destructive" }));
   }, [shareTrackingUrl]);
 
+  // Shared button classes — explicit foreground / border so controls stay
+  // legible on both light and dark map tiles.
+  const ctrlBtn =
+    "h-8 text-xs gap-1 bg-white text-slate-900 border border-slate-300 hover:bg-slate-100 shadow-sm";
+
   return (
     <MapErrorBoundary>
       <div ref={mapWrapRef} className="relative h-full w-full">
@@ -298,7 +333,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
           <div className="absolute top-2 left-2 right-2 z-[500] flex flex-wrap items-center gap-2 pointer-events-none">
             <div className="pointer-events-auto flex flex-wrap items-center gap-2">
               <Select value={basemap} onValueChange={(v) => setBasemap(v as BasemapId)}>
-                <SelectTrigger className="h-8 w-[140px] text-xs bg-card/95 backdrop-blur border-border shadow-sm">
+                <SelectTrigger className="h-8 w-[140px] text-xs bg-white text-slate-900 border border-slate-300 shadow-sm">
                   <SelectValue placeholder="Map" />
                 </SelectTrigger>
                 <SelectContent>
@@ -310,9 +345,8 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
               </Select>
               <Button
                 type="button"
-                variant="secondary"
                 size="sm"
-                className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
+                className={ctrlBtn}
                 onClick={() => setManualFitNonce((n) => n + 1)}
               >
                 <Crosshair className="h-3.5 w-3.5" />
@@ -321,9 +355,12 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
               {onFollowTruckChange && (
                 <Button
                   type="button"
-                  variant={followTruck ? "default" : "secondary"}
                   size="sm"
-                  className="h-8 text-xs gap-1 bg-card/95 backdrop-blur shadow-sm"
+                  className={
+                    followTruck
+                      ? "h-8 text-xs gap-1 bg-primary text-primary-foreground border border-primary shadow-sm hover:bg-primary/90"
+                      : ctrlBtn
+                  }
                   onClick={() => onFollowTruckChange(!followTruck)}
                   aria-pressed={followTruck}
                 >
@@ -333,20 +370,18 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
               )}
               <Button
                 type="button"
-                variant="secondary"
                 size="sm"
-                className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
+                className={ctrlBtn + " px-2"}
                 onClick={handleFullscreen}
-                title="Fullscreen"
+                title="Expand map"
               >
                 <Maximize2 className="h-3.5 w-3.5" />
               </Button>
               {shareTrackingUrl && (
                 <Button
                   type="button"
-                  variant="secondary"
                   size="sm"
-                  className="h-8 px-2 bg-card/95 backdrop-blur shadow-sm"
+                  className={ctrlBtn + " px-2"}
                   onClick={handleShare}
                   title="Copy tracking link"
                 >
@@ -368,13 +403,13 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
           <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
 
           <Polyline
-            positions={polylinePositions}
-            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }}
+            positions={traveledRoute}
+            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9, lineJoin: "round", lineCap: "round" }}
           />
 
           <Polyline
             positions={remainingRoute}
-            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
+            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.45, dashArray: "8, 8", lineCap: "round" }}
           />
 
           <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
@@ -394,8 +429,16 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
           >
             <Popup className="tracking-popup">
-              <div className="font-semibold text-xs">
-                {stationaryAtHold ? "Package location" : "Current location"}
+              <div className="space-y-0.5">
+                <div className="font-semibold text-xs">
+                  {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
+                </div>
+                {currentLocationLabel && (
+                  <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
+                )}
+                <div className="text-[10px] font-mono text-slate-500">
+                  {animatedLoc.lat.toFixed(5)}, {animatedLoc.lng.toFixed(5)}
+                </div>
               </div>
             </Popup>
           </Marker>

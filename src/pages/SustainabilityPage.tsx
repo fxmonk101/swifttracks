@@ -25,7 +25,7 @@ const SustainabilityPage = () => (
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="font-display text-4xl font-black text-foreground mb-4">DELIVERING A<br /><span className="text-primary">GREENER FUTURE</span></h2>
-            <p className="text-muted-foreground leading-relaxed mb-4">SwiftTrack is committed to reducing our environmental footprint. By 2030, we aim to achieve carbon-neutral operations across our entire logistics network.</p>
+            <p className="text-muted-foreground leading-relaxed mb-4">TransportHaven is committed to reducing our environmental footprint. By 2030, we aim to achieve carbon-neutral operations across our entire logistics network.</p>
             <p className="text-muted-foreground leading-relaxed">Our fleet is transitioning to electric vehicles, our facilities run on renewable energy, and our packaging is 100% recyclable.</p>
           </div>
           <div className="rounded-2xl overflow-hidden shadow-2xl">

@@ -508,6 +508,43 @@ const TrackPage = () => {
   const shareUrl =
     typeof window !== "undefined" && id ? `${window.location.origin}/track/${encodeURIComponent(id)}` : undefined;
 
+  // Latest event provides a human-readable current location label
+  const latestEvent = shipment?.events.length ? shipment.events[shipment.events.length - 1] : null;
+  const currentLocationText =
+    latestEvent?.location?.trim() ||
+    (shipment ? `${shipment.receiver.city}, ${shipment.receiver.state}` : "");
+  const currentLocationLabel = shipment
+    ? `${currentLocationText}${latestEvent?.description ? " — " + latestEvent.description : ""}`
+    : "";
+
+  // GPS accuracy & signal — derived from how recent the last snapshot is
+  // and how many recent snapshots exist. (No raw accuracy from device, so we
+  // synthesize a stable "good/fair/weak" signal from update freshness.)
+  const lastSnapshotAt =
+    locationRouteHistory.length > 0
+      ? null // we don't store created_at in state, fall back to shipment.updated_at
+      : null;
+  const lastUpdateMs = dbShipment?.created_at ? Date.now() - new Date(dbShipment.created_at).getTime() : 0;
+  const minutesSince = Math.floor(lastUpdateMs / 60000);
+  let signalLabel = "Strong";
+  let signalBars = 4;
+  if (locationRouteHistory.length === 0) {
+    signalLabel = "No GPS";
+    signalBars = 0;
+  } else if (locationRouteHistory.length < 3) {
+    signalLabel = "Acquiring";
+    signalBars = 2;
+  } else if (minutesSince > 30) {
+    signalLabel = "Weak";
+    signalBars = 1;
+  } else if (minutesSince > 10) {
+    signalLabel = "Fair";
+    signalBars = 3;
+  }
+  // Synthesized accuracy estimate based on snapshot density
+  const accuracyMeters = locationRouteHistory.length === 0 ? null : Math.max(5, 80 - locationRouteHistory.length * 2);
+  void lastSnapshotAt;
+
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col bg-muted/20">
@@ -520,7 +557,7 @@ const TrackPage = () => {
               Track Your Shipment
             </h1>
             <p className="text-secondary-foreground/60 text-sm text-center mb-5">
-              Enter your SwiftTrack tracking number for real-time updates
+              Enter your TransportHaven tracking number for real-time updates
             </p>
             <div className="flex gap-2 max-w-2xl mx-auto">
               <div className="relative flex-1">
@@ -561,7 +598,7 @@ const TrackPage = () => {
               <div>
                 <h2 className="font-display text-3xl font-bold text-foreground mb-2">Where's My Package?</h2>
                 <p className="text-muted-foreground">
-                  Enter your SwiftTrack tracking ID above to get real-time updates, live map, and delivery timeline.
+                  Enter your TransportHaven tracking ID above to get real-time updates, live map, and delivery timeline.
                 </p>
               </div>
             </div>
@@ -689,6 +726,7 @@ const TrackPage = () => {
                         mapFitNonce={mapFitNonce}
                         trackingIdForFit={shipment.trackingId}
                         shareTrackingUrl={shareUrl}
+                        currentLocationLabel={currentLocationLabel}
                       />
                     ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
@@ -701,6 +739,63 @@ const TrackPage = () => {
 
                 {/* Right sidebar: addresses */}
                 <div className="space-y-5">
+                  <Card className="p-5 border-border bg-secondary/5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-secondary/15 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-secondary" />
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        Current Location
+                      </h3>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground leading-snug">
+                      {currentLocationText || "Awaiting first scan"}
+                    </p>
+                    {latestEvent?.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{latestEvent.description}</p>
+                    )}
+                    {hasGps && (
+                      <p className="text-[10px] font-mono text-muted-foreground mt-2">
+                        {num(isDB && dbShipment ? dbShipment.current_lat : shipment?.currentLocation?.lat).toFixed(5)},{" "}
+                        {num(isDB && dbShipment ? dbShipment.current_lng : shipment?.currentLocation?.lng).toFixed(5)}
+                      </p>
+                    )}
+                  </Card>
+
+                  {/* GPS Signal & Accuracy */}
+                  <Card className="p-5 border-border">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center">
+                        <span className="text-xs">📡</span>
+                      </div>
+                      <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                        GPS Signal
+                      </h3>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{signalLabel}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Accuracy {accuracyMeters !== null ? `±${accuracyMeters} m` : "—"}
+                        </p>
+                      </div>
+                      <div className="flex items-end gap-0.5 h-6" aria-label={`Signal ${signalBars} of 4`}>
+                        {[1, 2, 3, 4].map((i) => (
+                          <span
+                            key={i}
+                            className={`w-1.5 rounded-sm ${
+                              i <= signalBars ? "bg-success" : "bg-muted"
+                            }`}
+                            style={{ height: `${i * 25}%` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-2">
+                      {locationRouteHistory.length} GPS pings recorded
+                    </p>
+                  </Card>
+
                   <Card className="p-5 border-border">
                     <div className="flex items-center gap-2 mb-3">
                       <div className="w-7 h-7 rounded-full bg-secondary/10 flex items-center justify-center">

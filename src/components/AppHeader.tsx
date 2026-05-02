@@ -33,7 +33,7 @@ const AppHeader = () => {
       <div className="bg-secondary text-secondary-foreground/80 text-xs">
         <div className="container flex items-center justify-between h-8">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> 1-800-SWIFT-TK</span>
+            <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> 1-800-TRANS-HV</span>
             <span className="hidden sm:flex items-center gap-1"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM EST</span>
           </div>
           <div className="flex items-center gap-4">

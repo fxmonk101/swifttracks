@@ -10,11 +10,11 @@ const Section = ({ children, className = "" }: { children: React.ReactNode; clas
 };
 
 const releases = [
-  { date: "Mar 15, 2024", title: "SwiftTrack Expands to 50 States with New Distribution Hub in Seattle", excerpt: "Completion of our nationwide network with a new state-of-the-art facility in the Pacific Northwest." },
-  { date: "Jan 22, 2024", title: "SwiftTrack Achieves 99.8% On-Time Delivery Rate in Q4 2023", excerpt: "Record-breaking performance driven by AI-powered route optimization." },
-  { date: "Nov 8, 2023", title: "SwiftTrack Launches Real-Time GPS Tracking for All Shipments", excerpt: "Customers can now watch their packages move in real time on an interactive map." },
-  { date: "Sep 3, 2023", title: "SwiftTrack Raises $50M Series C to Fuel Nationwide Expansion", excerpt: "Funding led by Logistics Ventures to expand fleet and technology infrastructure." },
-  { date: "Jun 14, 2023", title: "SwiftTrack Named 'Most Innovative Logistics Company' by TechCrunch", excerpt: "Recognition for our pioneering approach to transparent, technology-driven delivery." },
+  { date: "Mar 15, 2024", title: "TransportHaven Expands to 50 States with New Distribution Hub in Seattle", excerpt: "Completion of our nationwide network with a new state-of-the-art facility in the Pacific Northwest." },
+  { date: "Jan 22, 2024", title: "TransportHaven Achieves 99.8% On-Time Delivery Rate in Q4 2023", excerpt: "Record-breaking performance driven by AI-powered route optimization." },
+  { date: "Nov 8, 2023", title: "TransportHaven Launches Real-Time GPS Tracking for All Shipments", excerpt: "Customers can now watch their packages move in real time on an interactive map." },
+  { date: "Sep 3, 2023", title: "TransportHaven Raises $50M Series C to Fuel Nationwide Expansion", excerpt: "Funding led by Logistics Ventures to expand fleet and technology infrastructure." },
+  { date: "Jun 14, 2023", title: "TransportHaven Named 'Most Innovative Logistics Company' by TechCrunch", excerpt: "Recognition for our pioneering approach to transparent, technology-driven delivery." },
 ];
 
 const PressPage = () => (
@@ -23,7 +23,7 @@ const PressPage = () => (
     <section className="bg-secondary py-20">
       <div className="container text-center">
         <h1 className="font-display text-5xl md:text-7xl font-black text-secondary-foreground">PRESS & <span className="text-primary">NEWS</span></h1>
-        <p className="text-secondary-foreground/70 text-lg mt-4 max-w-2xl mx-auto">Latest news and announcements from SwiftTrack.</p>
+        <p className="text-secondary-foreground/70 text-lg mt-4 max-w-2xl mx-auto">Latest news and announcements from TransportHaven.</p>
       </div>
     </section>
 

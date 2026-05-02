@@ -330,7 +330,7 @@ const Index = () => {
                   </Link>
                 </div>
                 <div className="rounded-2xl overflow-hidden shadow-2xl">
-                  <img src={mobileTrackingImage} alt="SwiftTrack mobile tracking" className="w-full h-auto" loading="lazy" width={800} height={600} />
+                  <img src={mobileTrackingImage} alt="TransportHaven mobile tracking" className="w-full h-auto" loading="lazy" width={800} height={600} />
                 </div>
               </div>
             </Section>
@@ -338,7 +338,7 @@ const Index = () => {
             <Section>
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div className="rounded-2xl overflow-hidden shadow-2xl order-2 md:order-1">
-                  <img src={warehouseImage} alt="SwiftTrack sorting facility" className="w-full h-auto" loading="lazy" width={800} height={600} />
+                  <img src={warehouseImage} alt="TransportHaven sorting facility" className="w-full h-auto" loading="lazy" width={800} height={600} />
                 </div>
                 <div className="order-1 md:order-2">
                   <p className="font-mono text-xs text-primary tracking-widest uppercase mb-2">Modern Infrastructure</p>
@@ -385,7 +385,7 @@ const Index = () => {
                 </div>
               </div>
               <div className="rounded-2xl overflow-hidden shadow-2xl">
-                <img src={deliveryPersonImage} alt="SwiftTrack delivery confirmation" className="w-full h-auto" loading="lazy" width={800} height={600} />
+                <img src={deliveryPersonImage} alt="TransportHaven delivery confirmation" className="w-full h-auto" loading="lazy" width={800} height={600} />
               </div>
             </div>
           </Section>
@@ -401,7 +401,7 @@ const Index = () => {
               </div>
               <div className="grid md:grid-cols-3 gap-6">
                 {[
-                  { quote: "SwiftTrack's real-time GPS tracking is a game-changer. I can see exactly where my packages are at any moment.", name: "Sarah M.", role: "E-commerce Business Owner", stars: 5 },
+                  { quote: "TransportHaven's real-time GPS tracking is a game-changer. I can see exactly where my packages are at any moment.", name: "Sarah M.", role: "E-commerce Business Owner", stars: 5 },
                   { quote: "The delivery notifications are spot-on. Estimated delivery times are incredibly accurate.", name: "James K.", role: "Operations Manager", stars: 5 },
                   { quote: "Photo proof of delivery gives us peace of mind. We've reduced delivery disputes by 95%.", name: "Lisa W.", role: "Retail Director", stars: 5 },
                 ].map((testimonial) => (

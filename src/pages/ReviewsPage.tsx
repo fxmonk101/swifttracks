@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 const existingReviews = [
-  { name: "Sarah M.", role: "E-commerce Owner", stars: 5, text: "SwiftTrack's real-time GPS tracking is a game-changer. I can see exactly where my packages are at any moment.", date: "Mar 10, 2024" },
+  { name: "Sarah M.", role: "E-commerce Owner", stars: 5, text: "TransportHaven's real-time GPS tracking is a game-changer. I can see exactly where my packages are at any moment.", date: "Mar 10, 2024" },
   { name: "James K.", role: "Operations Manager", stars: 5, text: "The delivery notifications are spot-on. Estimated delivery times are incredibly accurate.", date: "Feb 28, 2024" },
   { name: "Lisa W.", role: "Retail Director", stars: 5, text: "Photo proof of delivery gives us peace of mind. We've reduced delivery disputes by 95%.", date: "Feb 15, 2024" },
   { name: "Mike R.", role: "Small Business Owner", stars: 4, text: "Great service overall. The Express Overnight is worth every penny for urgent shipments.", date: "Jan 22, 2024" },
@@ -38,7 +38,7 @@ const ReviewsPage = () => {
       <section className="bg-secondary py-20">
         <div className="container text-center">
           <h1 className="font-display text-5xl md:text-7xl font-black text-secondary-foreground">CUSTOMER <span className="text-primary">REVIEWS</span></h1>
-          <p className="text-secondary-foreground/70 text-lg mt-4 max-w-2xl mx-auto">See what our customers are saying about SwiftTrack.</p>
+          <p className="text-secondary-foreground/70 text-lg mt-4 max-w-2xl mx-auto">See what our customers are saying about TransportHaven.</p>
           <Button onClick={() => setShowForm(!showForm)} className="mt-6 bg-primary hover:bg-primary/90 text-primary-foreground font-display font-bold tracking-wide">
             <MessageSquare className="mr-2 h-4 w-4" /> {showForm ? "CLOSE FORM" : "WRITE A REVIEW"}
           </Button>

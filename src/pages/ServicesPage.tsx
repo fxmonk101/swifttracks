@@ -32,11 +32,11 @@ const ServicesPage = () => (
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="font-display text-4xl font-black text-foreground mb-4">FAST, RELIABLE<br /><span className="text-primary">DELIVERY</span></h2>
-            <p className="text-muted-foreground leading-relaxed mb-6">Whether you need next-day express or budget-friendly economy shipping, SwiftTrack has the right solution. Every shipment includes real-time GPS tracking and delivery notifications.</p>
+            <p className="text-muted-foreground leading-relaxed mb-6">Whether you need next-day express or budget-friendly economy shipping, TransportHaven has the right solution. Every shipment includes real-time GPS tracking and delivery notifications.</p>
             <Link to="/quote"><Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-display font-bold tracking-wide">GET A QUOTE <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
           </div>
           <div className="rounded-2xl overflow-hidden shadow-2xl">
-            <img src={deliveryVanImage} alt="SwiftTrack delivery van" className="w-full h-auto" loading="lazy" width={1920} height={800} />
+            <img src={deliveryVanImage} alt="TransportHaven delivery van" className="w-full h-auto" loading="lazy" width={1920} height={800} />
           </div>
         </div>
       </Section>
