@@ -403,13 +403,13 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
           <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
 
           <Polyline
-            positions={polylinePositions}
-            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9 }}
+            positions={traveledRoute}
+            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9, lineJoin: "round", lineCap: "round" }}
           />
 
           <Polyline
             positions={remainingRoute}
-            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.4, dashArray: "10, 8" }}
+            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.45, dashArray: "8, 8", lineCap: "round" }}
           />
 
           <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
@@ -429,8 +429,16 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
           >
             <Popup className="tracking-popup">
-              <div className="font-semibold text-xs">
-                {stationaryAtHold ? "Package location" : "Current location"}
+              <div className="space-y-0.5">
+                <div className="font-semibold text-xs">
+                  {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
+                </div>
+                {currentLocationLabel && (
+                  <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
+                )}
+                <div className="text-[10px] font-mono text-slate-500">
+                  {animatedLoc.lat.toFixed(5)}, {animatedLoc.lng.toFixed(5)}
+                </div>
               </div>
             </Popup>
           </Marker>
