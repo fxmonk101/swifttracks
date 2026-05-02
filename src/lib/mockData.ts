@@ -100,9 +100,9 @@ export const mockShipments: Shipment[] = [
 ];
 
 export const mockDrivers: Driver[] = [
-  { id: "d1", name: "Marcus Johnson", email: "marcus@swift.com", phone: "+1555-0101", onDuty: true, currentLocation: { lat: 39.2904, lng: -76.6122 }, accuracy: 12, speed: 45, heading: 210, activeShipments: ["ST-2024-AB3F7K9M"] },
-  { id: "d2", name: "Sarah Chen", email: "sarah@swift.com", phone: "+1555-0102", onDuty: true, currentLocation: { lat: 39.7392, lng: -104.9903 }, accuracy: 8, speed: 72, heading: 90, activeShipments: ["ST-2024-XK9P2L4N"] },
-  { id: "d3", name: "David Williams", email: "david@swift.com", phone: "+1555-0103", onDuty: false, currentLocation: { lat: 35.2271, lng: -80.8431 }, accuracy: 150, speed: 0, heading: 0, activeShipments: ["ST-2024-PL5W3Y8Z"] },
+  { id: "d1", name: "Marcus Johnson", email: "marcus@transporthaven.com", phone: "+1555-0101", onDuty: true, currentLocation: { lat: 39.2904, lng: -76.6122 }, accuracy: 12, speed: 45, heading: 210, activeShipments: ["ST-2024-AB3F7K9M"] },
+  { id: "d2", name: "Sarah Chen", email: "sarah@transporthaven.com", phone: "+1555-0102", onDuty: true, currentLocation: { lat: 39.7392, lng: -104.9903 }, accuracy: 8, speed: 72, heading: 90, activeShipments: ["ST-2024-XK9P2L4N"] },
+  { id: "d3", name: "David Williams", email: "david@transporthaven.com", phone: "+1555-0103", onDuty: false, currentLocation: { lat: 35.2271, lng: -80.8431 }, accuracy: 150, speed: 0, heading: 0, activeShipments: ["ST-2024-PL5W3Y8Z"] },
 ];
 
 export const routeHistory = routePoints;

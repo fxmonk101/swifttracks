@@ -520,7 +520,7 @@ const TrackPage = () => {
               Track Your Shipment
             </h1>
             <p className="text-secondary-foreground/60 text-sm text-center mb-5">
-              Enter your SwiftTrack tracking number for real-time updates
+              Enter your TransportHaven tracking number for real-time updates
             </p>
             <div className="flex gap-2 max-w-2xl mx-auto">
               <div className="relative flex-1">
@@ -561,7 +561,7 @@ const TrackPage = () => {
               <div>
                 <h2 className="font-display text-3xl font-bold text-foreground mb-2">Where's My Package?</h2>
                 <p className="text-muted-foreground">
-                  Enter your SwiftTrack tracking ID above to get real-time updates, live map, and delivery timeline.
+                  Enter your TransportHaven tracking ID above to get real-time updates, live map, and delivery timeline.
                 </p>
               </div>
             </div>
