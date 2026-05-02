@@ -13,6 +13,8 @@ import {
   Loader2,
   Navigation,
   Map,
+  Play,
+  Square,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
