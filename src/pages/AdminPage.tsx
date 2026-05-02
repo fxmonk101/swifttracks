@@ -693,6 +693,18 @@ const AdminPage = () => {
                         >
                           <Navigation className="h-3 w-3" /> GPS
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 text-secondary"
+                          onClick={() => {
+                            setSimulatingShipment(s);
+                          }}
+                          disabled={isAdmin === false}
+                          title="Start a real live trip — auto-moves the truck along the route"
+                        >
+                          <Play className="h-3 w-3" /> Trip
+                        </Button>
                       </td>
                     </tr>
                   ))}
