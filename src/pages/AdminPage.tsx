@@ -935,7 +935,100 @@ const AdminPage = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Real Trip control — auto-moves the truck along the route polyline */}
+      <Dialog
+        open={!!simulatingShipment}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (simulationRunning && simulationIntervalRef.current) {
+              clearInterval(simulationIntervalRef.current);
+              setSimulationRunning(false);
+            }
+            setSimulatingShipment(null);
+            setSimulationProgress(0);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display flex items-center gap-2">
+              <Play className="h-4 w-4 text-secondary" /> Real Trip Control
+            </DialogTitle>
+          </DialogHeader>
+          {simulatingShipment && (
+            <div className="space-y-4">
+              <div className="bg-muted/40 rounded-md p-3 space-y-1">
+                <p className="font-mono text-sm font-bold">{simulatingShipment.tracking_id}</p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold">From:</span> {simulatingShipment.sender_city}, {simulatingShipment.sender_state}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold">To:</span> {simulatingShipment.receiver_city}, {simulatingShipment.receiver_state}
+                </p>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                The truck will animate along the route from origin to destination, posting real GPS pings to the
+                tracking page every step. Status auto-promotes to <strong>IN_TRANSIT</strong> when the trip starts and
+                <strong> OUT_FOR_DELIVERY</strong> when it completes.
+              </p>
+
+              <div>
+                <Label className="text-xs">Trip speed</Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3"
+                    step="0.5"
+                    value={simulationSpeed}
+                    onChange={(e) => setSimulationSpeed(parseFloat(e.target.value))}
+                    disabled={simulationRunning}
+                    className="flex-1 h-2 rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-mono w-12 text-right">{simulationSpeed}x</span>
+                </div>
+              </div>
+
+              {(simulationRunning || simulationProgress > 0) && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium">Progress</span>
+                    <span className="text-xs font-mono">{simulationProgress.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-muted rounded overflow-hidden">
+                    <div
+                      className="h-full bg-secondary transition-all duration-300"
+                      style={{ width: `${simulationProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Button
+                onClick={
+                  simulationRunning
+                    ? handleStopSimulation
+                    : () => handleSimulateTrip(simulatingShipment || undefined)
+                }
+                className="w-full"
+                variant={simulationRunning ? "destructive" : "default"}
+              >
+                {simulationRunning ? (
+                  <>
+                    <Square className="h-4 w-4 mr-2" /> Stop Trip
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-2" /> Start Real Trip
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
   );
 };
 
