@@ -726,6 +726,7 @@ const TrackPage = () => {
                         mapFitNonce={mapFitNonce}
                         trackingIdForFit={shipment.trackingId}
                         shareTrackingUrl={shareUrl}
+                        currentLocationLabel={currentLocationLabel}
                       />
                     ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
