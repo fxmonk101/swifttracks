@@ -215,9 +215,19 @@ const AdminPage = () => {
   const handleSimulateTrip = async (targetShipment?: DBShipment) => {
     const shipment = targetShipment || simulatingShipment || gpsShipment;
     if (!shipment) return;
+
+    // Auto-promote to IN_TRANSIT so the trip can run from any starting state
     if (shipment.status !== "IN_TRANSIT") {
-      toast({ title: "Cannot simulate", description: "Shipment must be IN_TRANSIT to simulate", variant: "destructive" });
-      return;
+      const { error: stErr } = await supabase.rpc("update_shipment_status", {
+        p_shipment_id: shipment.id,
+        p_new_status: "IN_TRANSIT",
+        p_description: "Live trip started — package is now moving",
+        p_location: `${shipment.sender_city}, ${shipment.sender_state}`,
+      });
+      if (stErr) {
+        toast({ title: "Could not start trip", description: stErr.message, variant: "destructive" });
+        return;
+      }
     }
 
     // Resolve origin & destination coords
@@ -230,12 +240,13 @@ const AdminPage = () => {
       return;
     }
 
+    setSimulatingShipment(shipment);
     setSimulationRunning(true);
     setSimulationProgress(0);
     let currentProgress = 0;
     const stepSize = 5;
-    const baseDelay = 1000;
-    const delay = Math.max(100, baseDelay / simulationSpeed);
+    const baseDelay = 1500;
+    const delay = Math.max(150, baseDelay / simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
@@ -243,7 +254,7 @@ const AdminPage = () => {
         if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
         toast({
           title: "Trip Completed!",
-          description: "Truck has reached the destination. Status will update to OUT_FOR_DELIVERY.",
+          description: "Truck reached the destination — status set to OUT_FOR_DELIVERY.",
         });
         const { error } = await supabase.rpc("update_shipment_status", {
           p_shipment_id: shipment.id,
