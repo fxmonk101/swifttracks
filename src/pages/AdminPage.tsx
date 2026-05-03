@@ -110,6 +110,7 @@ const AdminPage = () => {
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [packageCount, setPackageCount] = useState(1);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
