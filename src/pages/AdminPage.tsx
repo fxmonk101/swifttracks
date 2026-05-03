@@ -547,6 +547,14 @@ const AdminPage = () => {
                       <Label className="text-xs">State *</Label>
                       <Input name="senderState" required className="text-sm" />
                     </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="senderEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="senderPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Receiver</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -566,8 +574,27 @@ const AdminPage = () => {
                       <Label className="text-xs">State *</Label>
                       <Input name="receiverState" required className="text-sm" />
                     </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="receiverEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="receiverPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Package</h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Schedule</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Pickup date & time</Label>
+                      <Input name="pickupDate" type="datetime-local" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Expected delivery date & time</Label>
+                      <Input name="estDelivery" type="datetime-local" className="text-sm" />
+                    </div>
+                  </div>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Service</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Service Type</Label>
@@ -583,14 +610,6 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-xs">Weight (kg)</Label>
-                      <Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Est. Delivery</Label>
-                      <Input name="estDelivery" type="date" className="text-sm" />
-                    </div>
                     <div className="flex items-end gap-2 pb-1">
                       <input type="checkbox" name="signature" id="signature" className="rounded" />
                       <Label htmlFor="signature" className="text-xs">
@@ -598,6 +617,38 @@ const AdminPage = () => {
                       </Label>
                     </div>
                   </div>
+
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                    <span>Packages</span>
+                    <span className="text-[10px] text-muted-foreground normal-case">Add multiple packages to one shipment</span>
+                  </h4>
+                  <div>
+                    <Label className="text-xs">Number of packages</Label>
+                    <Input
+                      name="packageCount"
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={packageCount}
+                      onChange={(e) => setPackageCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      className="text-sm w-32"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from({ length: packageCount }).map((_, i) => (
+                      <div key={i} className="border border-border rounded-md p-3 space-y-2 bg-muted/30">
+                        <p className="text-[11px] font-bold text-muted-foreground">Package #{i + 1}</p>
+                        <Input name={`pkgDesc_${i}`} placeholder="Description (e.g. Electronics)" className="text-xs h-8" />
+                        <div className="grid grid-cols-4 gap-2">
+                          <Input name={`pkgWeight_${i}`} type="number" step="0.1" placeholder="Wt (kg)" className="text-xs h-8" />
+                          <Input name={`pkgLength_${i}`} type="number" placeholder="L (cm)" className="text-xs h-8" />
+                          <Input name={`pkgWidth_${i}`} type="number" placeholder="W (cm)" className="text-xs h-8" />
+                          <Input name={`pkgHeight_${i}`} type="number" placeholder="H (cm)" className="text-xs h-8" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <Button type="submit" disabled={creating} className="w-full bg-primary text-primary-foreground">
                     {creating ? (
                       <>
