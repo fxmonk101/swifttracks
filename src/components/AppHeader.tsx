@@ -21,11 +21,11 @@ const AppHeader = () => {
 
   const navItems = [
     { to: "/", label: t("nav.home") },
-    { to: "/track", label: t("nav.track") },
     { to: "/services", label: t("nav.services") },
     { to: "/international", label: "International" },
     { to: "/business", label: "Business" },
     { to: "/support", label: t("nav.support") },
+    { to: "/contact", label: "Contact" },
   ];
 
   return (
@@ -33,7 +33,7 @@ const AppHeader = () => {
       <div className="bg-secondary text-secondary-foreground/80 text-xs">
         <div className="container flex items-center justify-between h-8">
           <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> 1-800-TRANS-HV</span>
+            <a href="tel:+12132469750" className="flex items-center gap-1 hover:text-secondary-foreground transition-colors"><Phone className="h-3 w-3" /> +1 (213) 246-9750</a>
             <span className="hidden sm:flex items-center gap-1"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM EST</span>
           </div>
           <div className="flex items-center gap-4">
