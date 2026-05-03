@@ -209,21 +209,55 @@ const MapFollowTruck = ({ location, follow }: { location: Coordinates; follow: b
 };
 
 // Auto-open the truck popup so the current-location label is visible without hover.
-const PopupAutoOpener = ({ position, signature }: { position: [number, number]; signature: string }) => {
-  const map = useMap();
+const PopupAutoOpener = (_: { position: [number, number]; signature: string }) => null;
+
+const TruckMarkerWithOpenPopup = ({
+  position,
+  icon,
+  stationaryAtHold,
+  currentLocationLabel,
+  accuracyMeters,
+  signalLabel,
+}: {
+  position: [number, number];
+  icon: L.DivIcon;
+  stationaryAtHold: boolean;
+  currentLocationLabel?: string;
+  accuracyMeters?: number | null;
+  signalLabel?: string;
+}) => {
+  const markerRef = useRef<L.Marker | null>(null);
   useEffect(() => {
-    const popup = L.popup({ autoClose: false, closeOnClick: false, closeButton: false, offset: [0, -18] })
-      .setLatLng(position)
-      .setContent(
-        `<div style="font-size:11px;font-weight:600;color:#0A2F6B">📍 You are here</div>`
-      );
-    // We rely on the Marker's own Popup to show full details; this is a no-op marker open.
-    // Opening the marker popup programmatically requires a marker ref, so instead we no-op here.
-    void popup;
-    void map;
-    void signature;
-  }, [map, signature, position]);
-  return null;
+    const m = markerRef.current;
+    if (m) {
+      // Defer to next tick so leaflet has wired up the popup
+      const t = setTimeout(() => m.openPopup(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [position[0], position[1]]);
+  return (
+    <Marker position={position} icon={icon} ref={(r) => { markerRef.current = r; }}>
+      <Popup className="tracking-popup" autoClose={false} closeOnClick={false} closeButton={false}>
+        <div className="space-y-0.5 min-w-[170px]">
+          <div className="font-semibold text-xs">
+            {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
+          </div>
+          {currentLocationLabel && (
+            <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
+          )}
+          <div className="text-[10px] font-mono text-slate-500">
+            {position[0].toFixed(5)}, {position[1].toFixed(5)}
+          </div>
+          {(signalLabel || accuracyMeters) && (
+            <div className="flex items-center justify-between pt-1 border-t border-slate-200 mt-1 text-[10px] text-slate-600">
+              {signalLabel && <span>📡 {signalLabel}</span>}
+              {accuracyMeters != null && <span>±{accuracyMeters} m</span>}
+            </div>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
 };
 
 export interface TrackingMapProps {
@@ -458,32 +492,14 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             />
           )}
 
-          <Marker
+          <TruckMarkerWithOpenPopup
             position={[animatedLoc.lat, animatedLoc.lng]}
             icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
-          >
-            <Popup className="tracking-popup" autoClose={false} closeOnClick={false} closeButton={false}>
-              <div className="space-y-0.5 min-w-[170px]">
-                <div className="font-semibold text-xs">
-                  {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
-                </div>
-                {currentLocationLabel && (
-                  <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
-                )}
-                <div className="text-[10px] font-mono text-slate-500">
-                  {animatedLoc.lat.toFixed(5)}, {animatedLoc.lng.toFixed(5)}
-                </div>
-                {(signalLabel || accuracyMeters) && (
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-200 mt-1 text-[10px] text-slate-600">
-                    {signalLabel && <span>📡 {signalLabel}</span>}
-                    {accuracyMeters != null && <span>±{accuracyMeters} m</span>}
-                  </div>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-
-          <PopupAutoOpener position={[animatedLoc.lat, animatedLoc.lng]} signature={`${animatedLoc.lat},${animatedLoc.lng}`} />
+            stationaryAtHold={stationaryAtHold}
+            currentLocationLabel={currentLocationLabel}
+            accuracyMeters={accuracyMeters}
+            signalLabel={signalLabel}
+          />
 
           <MapAutoFit
             points={fitPoints}
