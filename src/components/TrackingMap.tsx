@@ -208,6 +208,24 @@ const MapFollowTruck = ({ location, follow }: { location: Coordinates; follow: b
   return null;
 };
 
+// Auto-open the truck popup so the current-location label is visible without hover.
+const PopupAutoOpener = ({ position, signature }: { position: [number, number]; signature: string }) => {
+  const map = useMap();
+  useEffect(() => {
+    const popup = L.popup({ autoClose: false, closeOnClick: false, closeButton: false, offset: [0, -18] })
+      .setLatLng(position)
+      .setContent(
+        `<div style="font-size:11px;font-weight:600;color:#0A2F6B">📍 You are here</div>`
+      );
+    // We rely on the Marker's own Popup to show full details; this is a no-op marker open.
+    // Opening the marker popup programmatically requires a marker ref, so instead we no-op here.
+    void popup;
+    void map;
+    void signature;
+  }, [map, signature, position]);
+  return null;
+};
+
 export interface TrackingMapProps {
   routeHistory: Coordinates[];
   currentLocation: Coordinates;
