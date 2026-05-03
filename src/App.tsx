@@ -27,6 +27,8 @@ import AuthPage from "./pages/AuthPage";
 import CreateShipmentPage from "./pages/CreateShipmentPage";
 import InternationalPage from "./pages/InternationalPage";
 import BusinessPage from "./pages/BusinessPage";
+import ContactPage from "./pages/ContactPage";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,7 @@ const AnimatedRoutes = () => {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
+      <ScrollToTop />
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Index />} />
         <Route path="/track" element={<TrackPage />} />
@@ -58,6 +61,7 @@ const AnimatedRoutes = () => {
         <Route path="/create-shipment" element={<CreateShipmentPage />} />
         <Route path="/international" element={<InternationalPage />} />
         <Route path="/business" element={<BusinessPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>
