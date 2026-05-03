@@ -348,6 +348,17 @@ const AdminPage = () => {
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
 
+    const packageCount = parseInt((form.get("packageCount") as string) || "1", 10) || 1;
+    const packagesMeta = Array.from({ length: packageCount }, (_, i) => ({
+      index: i + 1,
+      weight: parseFloat((form.get(`pkgWeight_${i}`) as string) || "0") || 0,
+      length: parseFloat((form.get(`pkgLength_${i}`) as string) || "0") || 0,
+      width: parseFloat((form.get(`pkgWidth_${i}`) as string) || "0") || 0,
+      height: parseFloat((form.get(`pkgHeight_${i}`) as string) || "0") || 0,
+      description: (form.get(`pkgDesc_${i}`) as string) || "",
+    }));
+    const totalWeight = packagesMeta.reduce((s, p) => s + p.weight, 0);
+
     const { data, error } = await supabase
       .from("shipments")
       .insert({
@@ -357,12 +368,19 @@ const AdminPage = () => {
         sender_city: form.get("senderCity") as string,
         sender_state: form.get("senderState") as string,
         sender_street: form.get("senderStreet") as string,
+        sender_email: (form.get("senderEmail") as string) || null,
+        sender_phone: (form.get("senderPhone") as string) || null,
         receiver_name: form.get("receiverName") as string,
         receiver_city: form.get("receiverCity") as string,
         receiver_state: form.get("receiverState") as string,
         receiver_street: form.get("receiverStreet") as string,
-        weight: parseFloat(form.get("weight") as string) || 0,
+        receiver_email: (form.get("receiverEmail") as string) || null,
+        receiver_phone: (form.get("receiverPhone") as string) || null,
+        weight: totalWeight,
+        package_count: packageCount,
+        packages_meta: packagesMeta,
         requires_signature: form.get("signature") === "on",
+        pickup_date: (form.get("pickupDate") as string) || null,
         estimated_delivery_date: (form.get("estDelivery") as string) || null,
         created_by: user.id,
       })
@@ -376,7 +394,7 @@ const AdminPage = () => {
         await supabase.from("shipment_events").insert({
           shipment_id: data.id,
           status: "LABEL_CREATED",
-          description: "Shipping label created",
+          description: `Shipping label created — ${packageCount} package${packageCount > 1 ? "s" : ""}`,
           location: `${form.get("senderCity")}, ${form.get("senderState")}`,
         });
       }
