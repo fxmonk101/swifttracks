@@ -225,6 +225,11 @@ export interface TrackingMapProps {
   showMapControls?: boolean;
   /** Human-readable label for the current location popup, e.g. "Memphis, TN — At Facility" */
   currentLocationLabel?: string;
+  /** Optional GPS accuracy radius in meters */
+  accuracyMeters?: number | null;
+  /** Optional signal label for overlay (e.g. "Strong", "Weak") */
+  signalLabel?: string;
+  signalBars?: number;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
@@ -244,6 +249,9 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   shareTrackingUrl,
   showMapControls = true,
   currentLocationLabel,
+  accuracyMeters = null,
+  signalLabel,
+  signalBars = 0,
 }, _ref) => {
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
