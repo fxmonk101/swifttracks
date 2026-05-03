@@ -727,6 +727,9 @@ const TrackPage = () => {
                         trackingIdForFit={shipment.trackingId}
                         shareTrackingUrl={shareUrl}
                         currentLocationLabel={currentLocationLabel}
+                        accuracyMeters={accuracyMeters}
+                        signalLabel={signalLabel}
+                        signalBars={signalBars}
                       />
                     ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">

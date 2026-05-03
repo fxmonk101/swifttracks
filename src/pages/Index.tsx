@@ -85,8 +85,8 @@ const Index = () => {
         <section className="relative overflow-hidden bg-secondary">
           {heroSlides.map((s, i) => (
             <div key={i} className={`absolute inset-0 transition-opacity duration-1000 ${i === slide ? "opacity-100" : "opacity-0"}`}>
-              <img src={s.image} alt="" className="w-full h-full object-cover opacity-20" />
-              <div className="absolute inset-0 bg-gradient-to-r from-secondary via-secondary/95 to-secondary/70" />
+              <img src={s.image} alt="" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-r from-secondary via-secondary/85 to-secondary/30" />
             </div>
           ))}
 

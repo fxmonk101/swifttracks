@@ -110,6 +110,7 @@ const AdminPage = () => {
   const [simulationSpeed, setSimulationSpeed] = useState(1);
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [packageCount, setPackageCount] = useState(1);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
@@ -242,13 +243,39 @@ const AdminPage = () => {
       return;
     }
 
+    // Determine starting progress from current GPS so the truck doesn't jump back
+    let startProgress = 0;
+    const curLat = shipment.current_lat != null ? num(shipment.current_lat) : null;
+    const curLng = shipment.current_lng != null ? num(shipment.current_lng) : null;
+    if (curLat != null && curLng != null) {
+      const dx = d.lng - o.lng;
+      const dy = d.lat - o.lat;
+      const len2 = dx * dx + dy * dy;
+      if (len2 > 1e-9) {
+        const t = ((curLng - o.lng) * dx + (curLat - o.lat) * dy) / len2;
+        startProgress = Math.round(Math.max(0, Math.min(100, t * 100)));
+      }
+    }
+
     setSimulatingShipment(shipment);
     setSimulationRunning(true);
-    setSimulationProgress(0);
-    let currentProgress = 0;
-    const stepSize = 5;
-    const baseDelay = 1500;
-    const delay = Math.max(150, baseDelay / simulationSpeed);
+    setSimulationProgress(startProgress);
+    let currentProgress = startProgress;
+    const stepSize = 1; // 1% per tick — smoother + slower
+
+    // Realistic speed: average 55 mph long-haul trucking
+    // distance(km) at 55mph ≈ 88 km/h. Time(sec) per 1% step = (totalKm * 0.01) / (88/3600)
+    const R = 6371;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(d.lat - o.lat);
+    const dLng = toRad(d.lng - o.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(o.lat)) * Math.cos(toRad(d.lat)) * Math.sin(dLng / 2) ** 2;
+    const totalKm = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+    const realSecondsPerStep = (totalKm * 0.01) / (88 / 3600); // real-world seconds per 1%
+    // Compress real time so a 1000mi trip doesn't take all day. Cap step delay at 8s, min 1s.
+    // Compression factor: simulate at ~120x real time, then divide by simulationSpeed multiplier.
+    const compressed = (realSecondsPerStep / 120) * 1000;
+    const delay = Math.max(1000, Math.min(8000, compressed)) / Math.max(0.5, simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
@@ -322,6 +349,17 @@ const AdminPage = () => {
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
 
+    const packageCount = parseInt((form.get("packageCount") as string) || "1", 10) || 1;
+    const packagesMeta = Array.from({ length: packageCount }, (_, i) => ({
+      index: i + 1,
+      weight: parseFloat((form.get(`pkgWeight_${i}`) as string) || "0") || 0,
+      length: parseFloat((form.get(`pkgLength_${i}`) as string) || "0") || 0,
+      width: parseFloat((form.get(`pkgWidth_${i}`) as string) || "0") || 0,
+      height: parseFloat((form.get(`pkgHeight_${i}`) as string) || "0") || 0,
+      description: (form.get(`pkgDesc_${i}`) as string) || "",
+    }));
+    const totalWeight = packagesMeta.reduce((s, p) => s + p.weight, 0);
+
     const { data, error } = await supabase
       .from("shipments")
       .insert({
@@ -331,12 +369,19 @@ const AdminPage = () => {
         sender_city: form.get("senderCity") as string,
         sender_state: form.get("senderState") as string,
         sender_street: form.get("senderStreet") as string,
+        sender_email: (form.get("senderEmail") as string) || null,
+        sender_phone: (form.get("senderPhone") as string) || null,
         receiver_name: form.get("receiverName") as string,
         receiver_city: form.get("receiverCity") as string,
         receiver_state: form.get("receiverState") as string,
         receiver_street: form.get("receiverStreet") as string,
-        weight: parseFloat(form.get("weight") as string) || 0,
+        receiver_email: (form.get("receiverEmail") as string) || null,
+        receiver_phone: (form.get("receiverPhone") as string) || null,
+        weight: totalWeight,
+        package_count: packageCount,
+        packages_meta: packagesMeta,
         requires_signature: form.get("signature") === "on",
+        pickup_date: (form.get("pickupDate") as string) || null,
         estimated_delivery_date: (form.get("estDelivery") as string) || null,
         created_by: user.id,
       })
@@ -350,7 +395,7 @@ const AdminPage = () => {
         await supabase.from("shipment_events").insert({
           shipment_id: data.id,
           status: "LABEL_CREATED",
-          description: "Shipping label created",
+          description: `Shipping label created — ${packageCount} package${packageCount > 1 ? "s" : ""}`,
           location: `${form.get("senderCity")}, ${form.get("senderState")}`,
         });
       }
@@ -503,6 +548,14 @@ const AdminPage = () => {
                       <Label className="text-xs">State *</Label>
                       <Input name="senderState" required className="text-sm" />
                     </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="senderEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="senderPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Receiver</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -522,8 +575,27 @@ const AdminPage = () => {
                       <Label className="text-xs">State *</Label>
                       <Input name="receiverState" required className="text-sm" />
                     </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="receiverEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="receiverPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Package</h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Schedule</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Pickup date & time</Label>
+                      <Input name="pickupDate" type="datetime-local" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Expected delivery date & time</Label>
+                      <Input name="estDelivery" type="datetime-local" className="text-sm" />
+                    </div>
+                  </div>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Service</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Service Type</Label>
@@ -539,14 +611,6 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-xs">Weight (kg)</Label>
-                      <Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Est. Delivery</Label>
-                      <Input name="estDelivery" type="date" className="text-sm" />
-                    </div>
                     <div className="flex items-end gap-2 pb-1">
                       <input type="checkbox" name="signature" id="signature" className="rounded" />
                       <Label htmlFor="signature" className="text-xs">
@@ -554,6 +618,38 @@ const AdminPage = () => {
                       </Label>
                     </div>
                   </div>
+
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                    <span>Packages</span>
+                    <span className="text-[10px] text-muted-foreground normal-case">Add multiple packages to one shipment</span>
+                  </h4>
+                  <div>
+                    <Label className="text-xs">Number of packages</Label>
+                    <Input
+                      name="packageCount"
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={packageCount}
+                      onChange={(e) => setPackageCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      className="text-sm w-32"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    {Array.from({ length: packageCount }).map((_, i) => (
+                      <div key={i} className="border border-border rounded-md p-3 space-y-2 bg-muted/30">
+                        <p className="text-[11px] font-bold text-muted-foreground">Package #{i + 1}</p>
+                        <Input name={`pkgDesc_${i}`} placeholder="Description (e.g. Electronics)" className="text-xs h-8" />
+                        <div className="grid grid-cols-4 gap-2">
+                          <Input name={`pkgWeight_${i}`} type="number" step="0.1" placeholder="Wt (kg)" className="text-xs h-8" />
+                          <Input name={`pkgLength_${i}`} type="number" placeholder="L (cm)" className="text-xs h-8" />
+                          <Input name={`pkgWidth_${i}`} type="number" placeholder="W (cm)" className="text-xs h-8" />
+                          <Input name={`pkgHeight_${i}`} type="number" placeholder="H (cm)" className="text-xs h-8" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <Button type="submit" disabled={creating} className="w-full bg-primary text-primary-foreground">
                     {creating ? (
                       <>

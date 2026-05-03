@@ -1,5 +1,5 @@
 import { Component, forwardRef, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
@@ -208,6 +208,58 @@ const MapFollowTruck = ({ location, follow }: { location: Coordinates; follow: b
   return null;
 };
 
+// Auto-open the truck popup so the current-location label is visible without hover.
+const PopupAutoOpener = (_: { position: [number, number]; signature: string }) => null;
+
+const TruckMarkerWithOpenPopup = ({
+  position,
+  icon,
+  stationaryAtHold,
+  currentLocationLabel,
+  accuracyMeters,
+  signalLabel,
+}: {
+  position: [number, number];
+  icon: L.DivIcon;
+  stationaryAtHold: boolean;
+  currentLocationLabel?: string;
+  accuracyMeters?: number | null;
+  signalLabel?: string;
+}) => {
+  const markerRef = useRef<L.Marker | null>(null);
+  useEffect(() => {
+    const m = markerRef.current;
+    if (m) {
+      // Defer to next tick so leaflet has wired up the popup
+      const t = setTimeout(() => m.openPopup(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [position[0], position[1]]);
+  return (
+    <Marker position={position} icon={icon} ref={(r) => { markerRef.current = r; }}>
+      <Popup className="tracking-popup" autoClose={false} closeOnClick={false} closeButton={false}>
+        <div className="space-y-0.5 min-w-[170px]">
+          <div className="font-semibold text-xs">
+            {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
+          </div>
+          {currentLocationLabel && (
+            <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
+          )}
+          <div className="text-[10px] font-mono text-slate-500">
+            {position[0].toFixed(5)}, {position[1].toFixed(5)}
+          </div>
+          {(signalLabel || accuracyMeters) && (
+            <div className="flex items-center justify-between pt-1 border-t border-slate-200 mt-1 text-[10px] text-slate-600">
+              {signalLabel && <span>📡 {signalLabel}</span>}
+              {accuracyMeters != null && <span>±{accuracyMeters} m</span>}
+            </div>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+};
+
 export interface TrackingMapProps {
   routeHistory: Coordinates[];
   currentLocation: Coordinates;
@@ -225,6 +277,11 @@ export interface TrackingMapProps {
   showMapControls?: boolean;
   /** Human-readable label for the current location popup, e.g. "Memphis, TN — At Facility" */
   currentLocationLabel?: string;
+  /** Optional GPS accuracy radius in meters */
+  accuracyMeters?: number | null;
+  /** Optional signal label for overlay (e.g. "Strong", "Weak") */
+  signalLabel?: string;
+  signalBars?: number;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
@@ -244,6 +301,9 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   shareTrackingUrl,
   showMapControls = true,
   currentLocationLabel,
+  accuracyMeters = null,
+  signalLabel,
+  signalBars = 0,
 }, _ref) => {
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
@@ -424,24 +484,22 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             </Popup>
           </Marker>
 
-          <Marker
+          {accuracyMeters && accuracyMeters > 0 && (
+            <Circle
+              center={[animatedLoc.lat, animatedLoc.lng]}
+              radius={accuracyMeters}
+              pathOptions={{ color: "#0A2F6B", fillColor: "#0A2F6B", fillOpacity: 0.08, weight: 1, opacity: 0.4 }}
+            />
+          )}
+
+          <TruckMarkerWithOpenPopup
             position={[animatedLoc.lat, animatedLoc.lng]}
             icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
-          >
-            <Popup className="tracking-popup">
-              <div className="space-y-0.5">
-                <div className="font-semibold text-xs">
-                  {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
-                </div>
-                {currentLocationLabel && (
-                  <div className="text-[11px] text-slate-700">{currentLocationLabel}</div>
-                )}
-                <div className="text-[10px] font-mono text-slate-500">
-                  {animatedLoc.lat.toFixed(5)}, {animatedLoc.lng.toFixed(5)}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
+            stationaryAtHold={stationaryAtHold}
+            currentLocationLabel={currentLocationLabel}
+            accuracyMeters={accuracyMeters}
+            signalLabel={signalLabel}
+          />
 
           <MapAutoFit
             points={fitPoints}

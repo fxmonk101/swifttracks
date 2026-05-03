@@ -130,16 +130,23 @@ export type Database = {
           dimensions_width: number | null
           estimated_delivery_date: string | null
           id: string
+          package_count: number
+          packages_meta: Json | null
+          pickup_date: string | null
           receiver_city: string
           receiver_country: string | null
+          receiver_email: string | null
           receiver_name: string
+          receiver_phone: string | null
           receiver_state: string
           receiver_street: string | null
           receiver_zip: string | null
           requires_signature: boolean | null
           sender_city: string
           sender_country: string | null
+          sender_email: string | null
           sender_name: string
+          sender_phone: string | null
           sender_state: string
           sender_street: string | null
           sender_zip: string | null
@@ -161,16 +168,23 @@ export type Database = {
           dimensions_width?: number | null
           estimated_delivery_date?: string | null
           id?: string
+          package_count?: number
+          packages_meta?: Json | null
+          pickup_date?: string | null
           receiver_city: string
           receiver_country?: string | null
+          receiver_email?: string | null
           receiver_name: string
+          receiver_phone?: string | null
           receiver_state: string
           receiver_street?: string | null
           receiver_zip?: string | null
           requires_signature?: boolean | null
           sender_city: string
           sender_country?: string | null
+          sender_email?: string | null
           sender_name: string
+          sender_phone?: string | null
           sender_state: string
           sender_street?: string | null
           sender_zip?: string | null
@@ -192,16 +206,23 @@ export type Database = {
           dimensions_width?: number | null
           estimated_delivery_date?: string | null
           id?: string
+          package_count?: number
+          packages_meta?: Json | null
+          pickup_date?: string | null
           receiver_city?: string
           receiver_country?: string | null
+          receiver_email?: string | null
           receiver_name?: string
+          receiver_phone?: string | null
           receiver_state?: string
           receiver_street?: string | null
           receiver_zip?: string | null
           requires_signature?: boolean | null
           sender_city?: string
           sender_country?: string | null
+          sender_email?: string | null
           sender_name?: string
+          sender_phone?: string | null
           sender_state?: string
           sender_street?: string | null
           sender_zip?: string | null
