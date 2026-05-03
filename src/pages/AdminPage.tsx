@@ -242,13 +242,39 @@ const AdminPage = () => {
       return;
     }
 
+    // Determine starting progress from current GPS so the truck doesn't jump back
+    let startProgress = 0;
+    const curLat = shipment.current_lat != null ? num(shipment.current_lat) : null;
+    const curLng = shipment.current_lng != null ? num(shipment.current_lng) : null;
+    if (curLat != null && curLng != null) {
+      const dx = d.lng - o.lng;
+      const dy = d.lat - o.lat;
+      const len2 = dx * dx + dy * dy;
+      if (len2 > 1e-9) {
+        const t = ((curLng - o.lng) * dx + (curLat - o.lat) * dy) / len2;
+        startProgress = Math.round(Math.max(0, Math.min(100, t * 100)));
+      }
+    }
+
     setSimulatingShipment(shipment);
     setSimulationRunning(true);
-    setSimulationProgress(0);
-    let currentProgress = 0;
-    const stepSize = 5;
-    const baseDelay = 1500;
-    const delay = Math.max(150, baseDelay / simulationSpeed);
+    setSimulationProgress(startProgress);
+    let currentProgress = startProgress;
+    const stepSize = 1; // 1% per tick — smoother + slower
+
+    // Realistic speed: average 55 mph long-haul trucking
+    // distance(km) at 55mph ≈ 88 km/h. Time(sec) per 1% step = (totalKm * 0.01) / (88/3600)
+    const R = 6371;
+    const toRad = (x: number) => (x * Math.PI) / 180;
+    const dLat = toRad(d.lat - o.lat);
+    const dLng = toRad(d.lng - o.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(o.lat)) * Math.cos(toRad(d.lat)) * Math.sin(dLng / 2) ** 2;
+    const totalKm = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+    const realSecondsPerStep = (totalKm * 0.01) / (88 / 3600); // real-world seconds per 1%
+    // Compress real time so a 1000mi trip doesn't take all day. Cap step delay at 8s, min 1s.
+    // Compression factor: simulate at ~120x real time, then divide by simulationSpeed multiplier.
+    const compressed = (realSecondsPerStep / 120) * 1000;
+    const delay = Math.max(1000, Math.min(8000, compressed)) / Math.max(0.5, simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
