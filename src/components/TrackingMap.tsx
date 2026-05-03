@@ -1,5 +1,5 @@
 import { Component, forwardRef, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Coordinates } from "@/lib/types";
@@ -432,12 +432,20 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             </Popup>
           </Marker>
 
+          {accuracyMeters && accuracyMeters > 0 && (
+            <Circle
+              center={[animatedLoc.lat, animatedLoc.lng]}
+              radius={accuracyMeters}
+              pathOptions={{ color: "#0A2F6B", fillColor: "#0A2F6B", fillOpacity: 0.08, weight: 1, opacity: 0.4 }}
+            />
+          )}
+
           <Marker
             position={[animatedLoc.lat, animatedLoc.lng]}
             icon={stationaryAtHold ? holdIcon : createTruckIcon(effectiveHeading)}
           >
-            <Popup className="tracking-popup">
-              <div className="space-y-0.5">
+            <Popup className="tracking-popup" autoClose={false} closeOnClick={false} closeButton={false}>
+              <div className="space-y-0.5 min-w-[170px]">
                 <div className="font-semibold text-xs">
                   {stationaryAtHold ? "📦 Package on hold" : "🚚 Current location"}
                 </div>
@@ -447,9 +455,17 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
                 <div className="text-[10px] font-mono text-slate-500">
                   {animatedLoc.lat.toFixed(5)}, {animatedLoc.lng.toFixed(5)}
                 </div>
+                {(signalLabel || accuracyMeters) && (
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200 mt-1 text-[10px] text-slate-600">
+                    {signalLabel && <span>📡 {signalLabel}</span>}
+                    {accuracyMeters != null && <span>±{accuracyMeters} m</span>}
+                  </div>
+                )}
               </div>
             </Popup>
           </Marker>
+
+          <PopupAutoOpener position={[animatedLoc.lat, animatedLoc.lng]} signature={`${animatedLoc.lat},${animatedLoc.lng}`} />
 
           <MapAutoFit
             points={fitPoints}
