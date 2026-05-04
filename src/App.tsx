@@ -35,9 +35,10 @@ const queryClient = new QueryClient();
 const AnimatedRoutes = () => {
   const location = useLocation();
   return (
-    <AnimatePresence mode="wait">
+    <>
       <ScrollToTop />
-      <Routes location={location} key={location.pathname}>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Index />} />
         <Route path="/track" element={<TrackPage />} />
         <Route path="/track/:id" element={<TrackPage />} />
