@@ -505,6 +505,20 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
                   <Share2 className="h-3.5 w-3.5" />
                 </Button>
               )}
+              <Button
+                type="button"
+                size="sm"
+                className={
+                  debugOn
+                    ? "h-8 text-xs gap-1 bg-amber-500 text-white border border-amber-600 shadow-sm hover:bg-amber-600"
+                    : ctrlBtn
+                }
+                onClick={() => setDebugOn((v) => !v)}
+                title="Toggle developer overlay (axis + history filter)"
+                aria-pressed={debugOn}
+              >
+                🐞 Debug
+              </Button>
             </div>
           </div>
         )}
