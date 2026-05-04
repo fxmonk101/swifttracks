@@ -188,6 +188,19 @@ const AdminPage = () => {
       toast({ title: "Not authorized", description: (data as { error?: string }).error, variant: "destructive" });
     } else {
       toast({ title: "GPS Updated", description: `Truck moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+      // Persist this facility as the new trip origin so a fresh "Start trip"
+      // continues from here instead of restarting at the sender city.
+      try {
+        const tripKey = `th-trip:${gpsShipment.id}`;
+        const raw = localStorage.getItem(tripKey);
+        const prev = raw ? JSON.parse(raw) : {};
+        localStorage.setItem(
+          tripKey,
+          JSON.stringify({ ...prev, o: { lat, lng }, savedAt: Date.now() })
+        );
+      } catch {
+        /* non-fatal */
+      }
       setGpsShipment(null);
       setGpsLat("");
       setGpsLng("");
@@ -233,14 +246,34 @@ const AdminPage = () => {
       }
     }
 
-    // Resolve origin & destination coords
-    const [o, d] = await Promise.all([
-      geocode(`${shipment.sender_city}, ${shipment.sender_state}`),
+    // Persisted trip endpoints — survive page reloads, and let an updated
+    // facility act as the new origin without restarting from sender city.
+    const tripKey = `th-trip:${shipment.id}`;
+    type SavedTrip = { o: Coordinates; d: Coordinates; savedAt: number };
+    let saved: SavedTrip | null = null;
+    try {
+      const raw = localStorage.getItem(tripKey);
+      if (raw) saved = JSON.parse(raw) as SavedTrip;
+    } catch {
+      saved = null;
+    }
+
+    // Resolve destination from receiver city; resolve origin from saved trip if
+    // present (preferred), otherwise from sender city.
+    const [oFromSender, dFresh] = await Promise.all([
+      saved ? Promise.resolve(saved.o) : geocode(`${shipment.sender_city}, ${shipment.sender_state}`),
       geocode(`${shipment.receiver_city}, ${shipment.receiver_state}`),
     ]);
+    const o = oFromSender;
+    const d = dFresh;
     if (!o || !d) {
       toast({ title: "Geocode failed", description: "Could not resolve origin or destination", variant: "destructive" });
       return;
+    }
+    try {
+      localStorage.setItem(tripKey, JSON.stringify({ o, d, savedAt: Date.now() } satisfies SavedTrip));
+    } catch {
+      /* storage may be full / disabled — non-fatal */
     }
 
     // Determine starting progress from current GPS so the truck doesn't jump back

@@ -282,6 +282,8 @@ export interface TrackingMapProps {
   /** Optional signal label for overlay (e.g. "Strong", "Weak") */
   signalLabel?: string;
   signalBars?: number;
+  /** When true, draws debug overlays: origin→destination axis, raw vs filtered history points. */
+  debug?: boolean;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
@@ -304,7 +306,10 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   accuracyMeters = null,
   signalLabel,
   signalBars = 0,
+  debug: debugProp = false,
 }, _ref) => {
+  const [debugOn, setDebugOn] = useState(debugProp);
+  useEffect(() => setDebugOn(debugProp), [debugProp]);
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
   const safeCurrent = isFiniteCoord(currentLocation) ? currentLocation : safeOrigin;
@@ -334,14 +339,45 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
     [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]
   );
 
-  const traveledRoute = useMemo<[number, number][]>(() => {
+  // Perpendicular distance (in degrees) from p to the origin→destination axis.
+  const perpDistDeg = useCallback(
+    (p: Coordinates) => {
+      const dx = safeDestination.lng - safeOrigin.lng;
+      const dy = safeDestination.lat - safeOrigin.lat;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-9) return 0;
+      // |cross product| / |axis|
+      return Math.abs((p.lng - safeOrigin.lng) * dy - (p.lat - safeOrigin.lat) * dx) / len;
+    },
+    [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]
+  );
+
+  // Allowed lateral wander from the axis = 8% of the axis length (with sane min).
+  const axisLenDeg = useMemo(() => {
+    const dx = safeDestination.lng - safeOrigin.lng;
+    const dy = safeDestination.lat - safeOrigin.lat;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]);
+  const lateralLimit = Math.max(0.15, axisLenDeg * 0.08);
+
+  const { keptHistory, rejectedHistory } = useMemo(() => {
     const currentT = projectProgress(animatedLoc);
-    // Keep only history points that lie between origin and current position
-    const filteredHistory = safeHistory.filter((p) => {
+    const kept: Coordinates[] = [];
+    const rejected: Coordinates[] = [];
+    for (const p of safeHistory) {
       const t = projectProgress(p);
-      return t >= -0.05 && t <= currentT + 0.02;
-    });
-    const raw: Coordinates[] = [safeOrigin, ...filteredHistory, animatedLoc];
+      const d = perpDistDeg(p);
+      if (t >= -0.05 && t <= currentT + 0.02 && d <= lateralLimit) {
+        kept.push(p);
+      } else {
+        rejected.push(p);
+      }
+    }
+    return { keptHistory: kept, rejectedHistory: rejected };
+  }, [safeHistory, animatedLoc, projectProgress, perpDistDeg, lateralLimit]);
+
+  const traveledRoute = useMemo<[number, number][]>(() => {
+    const raw: Coordinates[] = [safeOrigin, ...keptHistory, animatedLoc];
     const out: Coordinates[] = [];
     const MIN_M = 300;
     for (const p of raw) {
@@ -366,7 +402,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
       out.push(animatedLoc);
     }
     return out.map((p): [number, number] => [p.lat, p.lng]);
-  }, [safeOrigin, safeHistory, animatedLoc, projectProgress]);
+  }, [safeOrigin, keptHistory, animatedLoc]);
 
   // Remaining route: always anchored to the (live) destination coords.
   const remainingRoute: [number, number][] = useMemo(
@@ -469,6 +505,20 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
                   <Share2 className="h-3.5 w-3.5" />
                 </Button>
               )}
+              <Button
+                type="button"
+                size="sm"
+                className={
+                  debugOn
+                    ? "h-8 text-xs gap-1 bg-amber-500 text-white border border-amber-600 shadow-sm hover:bg-amber-600"
+                    : ctrlBtn
+                }
+                onClick={() => setDebugOn((v) => !v)}
+                title="Toggle developer overlay (axis + history filter)"
+                aria-pressed={debugOn}
+              >
+                🐞 Debug
+              </Button>
             </div>
           </div>
         )}
@@ -493,6 +543,36 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.45, dashArray: "8, 8", lineCap: "round" }}
           />
 
+          {debugOn && (
+            <>
+              {/* Origin → destination axis */}
+              <Polyline
+                positions={[
+                  [safeOrigin.lat, safeOrigin.lng],
+                  [safeDestination.lat, safeDestination.lng],
+                ]}
+                pathOptions={{ color: "#f59e0b", weight: 2, opacity: 0.7, dashArray: "2, 6" }}
+              />
+              {/* Kept history points (green) */}
+              {keptHistory.map((p, i) => (
+                <Circle
+                  key={`kept-${i}-${p.lat}-${p.lng}`}
+                  center={[p.lat, p.lng]}
+                  radius={4000}
+                  pathOptions={{ color: "#16a34a", fillColor: "#16a34a", fillOpacity: 0.5, weight: 1 }}
+                />
+              ))}
+              {/* Rejected history points (red) */}
+              {rejectedHistory.map((p, i) => (
+                <Circle
+                  key={`rej-${i}-${p.lat}-${p.lng}`}
+                  center={[p.lat, p.lng]}
+                  radius={4000}
+                  pathOptions={{ color: "#dc2626", fillColor: "#dc2626", fillOpacity: 0.4, weight: 1 }}
+                />
+              ))}
+            </>
+          )}
           <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
             <Popup className="tracking-popup">
               <div className="font-semibold text-xs">Origin</div>
