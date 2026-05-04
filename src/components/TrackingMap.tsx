@@ -319,10 +319,29 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   const mapWrapRef = useRef<HTMLDivElement>(null);
 
   // Build a clean traveled route: origin -> de-duplicated history -> current.
-  // We collapse points that are within ~300m of each other so the line doesn't
-  // get a jagged "many short segments" look from frequent GPS pings.
+  // We collapse points within ~300m and DROP any stale history point whose
+  // progress along the origin→destination axis is *past* the current position
+  // — this prevents leftover routes from previous destinations showing up
+  // when an admin updates the location.
+  const projectProgress = useCallback(
+    (p: Coordinates) => {
+      const dx = safeDestination.lng - safeOrigin.lng;
+      const dy = safeDestination.lat - safeOrigin.lat;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < 1e-12) return 0;
+      return ((p.lng - safeOrigin.lng) * dx + (p.lat - safeOrigin.lat) * dy) / len2;
+    },
+    [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]
+  );
+
   const traveledRoute = useMemo<[number, number][]>(() => {
-    const raw: Coordinates[] = [safeOrigin, ...safeHistory, animatedLoc];
+    const currentT = projectProgress(animatedLoc);
+    // Keep only history points that lie between origin and current position
+    const filteredHistory = safeHistory.filter((p) => {
+      const t = projectProgress(p);
+      return t >= -0.05 && t <= currentT + 0.02;
+    });
+    const raw: Coordinates[] = [safeOrigin, ...filteredHistory, animatedLoc];
     const out: Coordinates[] = [];
     const MIN_M = 300;
     for (const p of raw) {
@@ -331,7 +350,6 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
         continue;
       }
       const last = out[out.length - 1];
-      // crude meter distance
       const R = 6371008;
       const dLat = ((p.lat - last.lat) * Math.PI) / 180;
       const dLng = ((p.lng - last.lng) * Math.PI) / 180;
@@ -343,18 +361,21 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
       const dist = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
       if (dist >= MIN_M) out.push(p);
     }
-    // ensure last point is current
     const lastOut = out[out.length - 1];
     if (lastOut.lat !== animatedLoc.lat || lastOut.lng !== animatedLoc.lng) {
       out.push(animatedLoc);
     }
     return out.map((p): [number, number] => [p.lat, p.lng]);
-  }, [safeOrigin, safeHistory, animatedLoc]);
+  }, [safeOrigin, safeHistory, animatedLoc, projectProgress]);
 
-  const remainingRoute: [number, number][] = [
-    [animatedLoc.lat, animatedLoc.lng],
-    [safeDestination.lat, safeDestination.lng],
-  ];
+  // Remaining route: always anchored to the (live) destination coords.
+  const remainingRoute: [number, number][] = useMemo(
+    () => [
+      [animatedLoc.lat, animatedLoc.lng],
+      [safeDestination.lat, safeDestination.lng],
+    ],
+    [animatedLoc.lat, animatedLoc.lng, safeDestination.lat, safeDestination.lng]
+  );
 
   const fitPoints = useMemo(
     () => [safeOrigin, ...safeHistory, safeCurrent, safeDestination].filter(isFiniteCoord),
