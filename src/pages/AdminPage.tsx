@@ -263,19 +263,26 @@ const AdminPage = () => {
     let currentProgress = startProgress;
     const stepSize = 1; // 1% per tick — smoother + slower
 
-    // Realistic speed: average 55 mph long-haul trucking
-    // distance(km) at 55mph ≈ 88 km/h. Time(sec) per 1% step = (totalKm * 0.01) / (88/3600)
+    // Realistic speed calibration:
+    //   - Long-haul truck average: ~55 mph (88 km/h)
+    //   - We want the *displayed* speed on the tracking page to match this,
+    //     while still finishing the simulation in a reasonable time.
+    //   - Time-compression is distance-aware: short trips compress less
+    //     (so the marker doesn't teleport); long trips compress more.
     const R = 6371;
     const toRad = (x: number) => (x * Math.PI) / 180;
     const dLat = toRad(d.lat - o.lat);
     const dLng = toRad(d.lng - o.lng);
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(o.lat)) * Math.cos(toRad(d.lat)) * Math.sin(dLng / 2) ** 2;
     const totalKm = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
-    const realSecondsPerStep = (totalKm * 0.01) / (88 / 3600); // real-world seconds per 1%
-    // Compress real time so a 1000mi trip doesn't take all day. Cap step delay at 8s, min 1s.
-    // Compression factor: simulate at ~120x real time, then divide by simulationSpeed multiplier.
-    const compressed = (realSecondsPerStep / 120) * 1000;
-    const delay = Math.max(1000, Math.min(8000, compressed)) / Math.max(0.5, simulationSpeed);
+    const AVG_KMH = 88; // ~55 mph cruising
+    const realSecondsPerStep = (totalKm * 0.01) / (AVG_KMH / 3600); // real-world seconds per 1%
+    // Distance-aware compression: 30x for <100km, scaling up to 240x for transcontinental.
+    const compression = Math.min(240, Math.max(30, totalKm / 8));
+    const compressed = (realSecondsPerStep / compression) * 1000;
+    // Clamp per-step delay so the marker always moves at a believable cadence.
+    // Min 1.5s prevents "overspeed" (warp jumps); max 6s keeps it feeling live.
+    const delay = Math.max(1500, Math.min(6000, compressed)) / Math.max(0.5, simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
