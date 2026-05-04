@@ -339,14 +339,45 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
     [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]
   );
 
-  const traveledRoute = useMemo<[number, number][]>(() => {
+  // Perpendicular distance (in degrees) from p to the origin→destination axis.
+  const perpDistDeg = useCallback(
+    (p: Coordinates) => {
+      const dx = safeDestination.lng - safeOrigin.lng;
+      const dy = safeDestination.lat - safeOrigin.lat;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-9) return 0;
+      // |cross product| / |axis|
+      return Math.abs((p.lng - safeOrigin.lng) * dy - (p.lat - safeOrigin.lat) * dx) / len;
+    },
+    [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]
+  );
+
+  // Allowed lateral wander from the axis = 8% of the axis length (with sane min).
+  const axisLenDeg = useMemo(() => {
+    const dx = safeDestination.lng - safeOrigin.lng;
+    const dy = safeDestination.lat - safeOrigin.lat;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, [safeOrigin.lat, safeOrigin.lng, safeDestination.lat, safeDestination.lng]);
+  const lateralLimit = Math.max(0.15, axisLenDeg * 0.08);
+
+  const { keptHistory, rejectedHistory } = useMemo(() => {
     const currentT = projectProgress(animatedLoc);
-    // Keep only history points that lie between origin and current position
-    const filteredHistory = safeHistory.filter((p) => {
+    const kept: Coordinates[] = [];
+    const rejected: Coordinates[] = [];
+    for (const p of safeHistory) {
       const t = projectProgress(p);
-      return t >= -0.05 && t <= currentT + 0.02;
-    });
-    const raw: Coordinates[] = [safeOrigin, ...filteredHistory, animatedLoc];
+      const d = perpDistDeg(p);
+      if (t >= -0.05 && t <= currentT + 0.02 && d <= lateralLimit) {
+        kept.push(p);
+      } else {
+        rejected.push(p);
+      }
+    }
+    return { keptHistory: kept, rejectedHistory: rejected };
+  }, [safeHistory, animatedLoc, projectProgress, perpDistDeg, lateralLimit]);
+
+  const traveledRoute = useMemo<[number, number][]>(() => {
+    const raw: Coordinates[] = [safeOrigin, ...keptHistory, animatedLoc];
     const out: Coordinates[] = [];
     const MIN_M = 300;
     for (const p of raw) {
@@ -371,7 +402,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
       out.push(animatedLoc);
     }
     return out.map((p): [number, number] => [p.lat, p.lng]);
-  }, [safeOrigin, safeHistory, animatedLoc, projectProgress]);
+  }, [safeOrigin, keptHistory, animatedLoc]);
 
   // Remaining route: always anchored to the (live) destination coords.
   const remainingRoute: [number, number][] = useMemo(
