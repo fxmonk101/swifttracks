@@ -499,7 +499,11 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             </Popup>
           </Marker>
 
-          <Marker position={[safeDestination.lat, safeDestination.lng]} icon={destinationIcon}>
+          <Marker
+            key={`dest-${safeDestination.lat.toFixed(5)}-${safeDestination.lng.toFixed(5)}`}
+            position={[safeDestination.lat, safeDestination.lng]}
+            icon={destinationIcon}
+          >
             <Popup className="tracking-popup">
               <div className="font-semibold text-xs">Destination</div>
             </Popup>
