@@ -188,6 +188,19 @@ const AdminPage = () => {
       toast({ title: "Not authorized", description: (data as { error?: string }).error, variant: "destructive" });
     } else {
       toast({ title: "GPS Updated", description: `Truck moved to ${lat.toFixed(4)}, ${lng.toFixed(4)}` });
+      // Persist this facility as the new trip origin so a fresh "Start trip"
+      // continues from here instead of restarting at the sender city.
+      try {
+        const tripKey = `th-trip:${gpsShipment.id}`;
+        const raw = localStorage.getItem(tripKey);
+        const prev = raw ? JSON.parse(raw) : {};
+        localStorage.setItem(
+          tripKey,
+          JSON.stringify({ ...prev, o: { lat, lng }, savedAt: Date.now() })
+        );
+      } catch {
+        /* non-fatal */
+      }
       setGpsShipment(null);
       setGpsLat("");
       setGpsLng("");
