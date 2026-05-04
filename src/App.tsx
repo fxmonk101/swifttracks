@@ -65,7 +65,8 @@ const AnimatedRoutes = () => {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </AnimatePresence>
+      </AnimatePresence>
+    </>
   );
 };
 
