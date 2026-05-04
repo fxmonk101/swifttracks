@@ -543,6 +543,36 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
             pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.45, dashArray: "8, 8", lineCap: "round" }}
           />
 
+          {debugOn && (
+            <>
+              {/* Origin → destination axis */}
+              <Polyline
+                positions={[
+                  [safeOrigin.lat, safeOrigin.lng],
+                  [safeDestination.lat, safeDestination.lng],
+                ]}
+                pathOptions={{ color: "#f59e0b", weight: 2, opacity: 0.7, dashArray: "2, 6" }}
+              />
+              {/* Kept history points (green) */}
+              {keptHistory.map((p, i) => (
+                <Circle
+                  key={`kept-${i}-${p.lat}-${p.lng}`}
+                  center={[p.lat, p.lng]}
+                  radius={4000}
+                  pathOptions={{ color: "#16a34a", fillColor: "#16a34a", fillOpacity: 0.5, weight: 1 }}
+                />
+              ))}
+              {/* Rejected history points (red) */}
+              {rejectedHistory.map((p, i) => (
+                <Circle
+                  key={`rej-${i}-${p.lat}-${p.lng}`}
+                  center={[p.lat, p.lng]}
+                  radius={4000}
+                  pathOptions={{ color: "#dc2626", fillColor: "#dc2626", fillOpacity: 0.4, weight: 1 }}
+                />
+              ))}
+            </>
+          )}
           <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
             <Popup className="tracking-popup">
               <div className="font-semibold text-xs">Origin</div>
