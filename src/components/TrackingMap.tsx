@@ -282,6 +282,8 @@ export interface TrackingMapProps {
   /** Optional signal label for overlay (e.g. "Strong", "Weak") */
   signalLabel?: string;
   signalBars?: number;
+  /** When true, draws debug overlays: origin→destination axis, raw vs filtered history points. */
+  debug?: boolean;
 }
 
 const isFiniteCoord = (p: Coordinates | undefined | null): p is Coordinates =>
@@ -304,7 +306,10 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   accuracyMeters = null,
   signalLabel,
   signalBars = 0,
+  debug: debugProp = false,
 }, _ref) => {
+  const [debugOn, setDebugOn] = useState(debugProp);
+  useEffect(() => setDebugOn(debugProp), [debugProp]);
   const safeOrigin = isFiniteCoord(origin) ? origin : { lat: 39.8283, lng: -98.5795 };
   const safeDestination = isFiniteCoord(destination) ? destination : safeOrigin;
   const safeCurrent = isFiniteCoord(currentLocation) ? currentLocation : safeOrigin;
