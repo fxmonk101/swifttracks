@@ -10,7 +10,7 @@ const faqs = [
   { q: "What is the maximum package weight?", a: "Express and Standard services accept packages up to 150 lbs. Economy Saver accepts up to 70 lbs. For heavier items, contact us for special handling." },
   { q: "Do you offer signature confirmation?", a: "Yes, signature confirmation is available on all service tiers. It's included free with Express Overnight and available as an add-on for other services." },
   { q: "What happens if my package is delayed?", a: "We'll notify you immediately via email and SMS if there's any delay. Express Overnight shipments come with a money-back guarantee if not delivered on time." },
-  { q: "How do I file a claim for a damaged package?", a: "Contact our support team at 1-800-TRANS-HV or email support@transporthaven.com with your tracking ID and photos of the damage. Claims are typically resolved within 5 business days." },
+  { q: "How do I file a claim for a damaged package?", a: "Contact our support team at +1 (213) 595-7723 (call or text) or email support@transporthaven.com with your tracking ID and photos of the damage. Claims are typically resolved within 5 business days." },
   { q: "Do you deliver on weekends?", a: "Saturday delivery is available for Express Overnight and Standard Ground shipments. Sunday delivery is not currently available." },
   { q: "Can I change the delivery address after shipping?", a: "Yes, you can redirect a package to a different address before it's out for delivery. Log in to your account or contact support with your tracking ID." },
 ];

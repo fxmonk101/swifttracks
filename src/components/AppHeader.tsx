@@ -33,7 +33,7 @@ const AppHeader = () => {
       <div className="bg-secondary text-secondary-foreground/80 text-xs">
         <div className="container flex items-center justify-between h-8">
           <div className="flex items-center gap-4">
-            <a href="tel:+12132469750" className="flex items-center gap-1 hover:text-secondary-foreground transition-colors"><Phone className="h-3 w-3" /> +1 (213) 246-9750</a>
+            <a href="tel:+12135957723" className="flex items-center gap-1 hover:text-secondary-foreground transition-colors"><Phone className="h-3 w-3" /> +1 (213) 595-7723</a>
             <span className="hidden sm:flex items-center gap-1"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM EST</span>
           </div>
           <div className="flex items-center gap-4">

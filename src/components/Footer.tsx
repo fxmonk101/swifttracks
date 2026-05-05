@@ -42,7 +42,7 @@ const Footer = () => {
               <li><Link to="/contact" className="hover:text-background transition-colors">Contact Us</Link></li>
               <li><Link to="/faq" className="hover:text-background transition-colors">{t("footer.faq")}</Link></li>
               <li><Link to="/reviews" className="hover:text-background transition-colors">{t("footer.reviews")}</Link></li>
-              <li><a href="tel:+12132469750" className="flex items-center gap-2 hover:text-background"><Phone className="h-3 w-3" /> +1 (213) 246-9750</a></li>
+              <li><a href="tel:+12135957723" className="flex items-center gap-2 hover:text-background"><Phone className="h-3 w-3" /> +1 (213) 595-7723</a></li>
               <li className="flex items-center gap-2"><Mail className="h-3 w-3" /> support@transporthaven.com</li>
               <li className="flex items-center gap-2"><Clock className="h-3 w-3" /> Mon-Sat 8AM-8PM</li>
             </ul>
