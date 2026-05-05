@@ -438,6 +438,20 @@ const AdminPage = () => {
           description: `Shipping label created — ${packageCount} package${packageCount > 1 ? "s" : ""}`,
           location: `${form.get("senderCity")}, ${form.get("senderState")}`,
         });
+        // Notify sender + receiver via email
+        supabase.functions.invoke("send-shipment-email", {
+          body: {
+            type: "created",
+            trackingId: data.tracking_id,
+            senderName: data.sender_name,
+            senderEmail: data.sender_email,
+            receiverName: data.receiver_name,
+            receiverEmail: data.receiver_email,
+            origin: `${data.sender_city}, ${data.sender_state}`,
+            destination: `${data.receiver_city}, ${data.receiver_state}`,
+            estimatedDelivery: data.estimated_delivery_date,
+          },
+        }).catch((err) => console.error("Email notification failed:", err));
       }
       toast({ title: "Shipment Created!", description: `Tracking ID: ${trackingId}` });
       setShowCreateDialog(false);
