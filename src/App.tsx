@@ -78,6 +78,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AnimatedRoutes />
+        <LiveChatWidget />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
