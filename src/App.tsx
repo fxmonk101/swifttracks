@@ -29,6 +29,7 @@ import InternationalPage from "./pages/InternationalPage";
 import BusinessPage from "./pages/BusinessPage";
 import ContactPage from "./pages/ContactPage";
 import ScrollToTop from "./components/ScrollToTop";
+import LiveChatWidget from "./components/LiveChatWidget";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AnimatedRoutes />
+        <LiveChatWidget />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

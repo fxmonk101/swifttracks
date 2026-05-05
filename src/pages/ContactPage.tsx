@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
-const SUPPORT_PHONE = "+1 (213) 246-9750";
+const SUPPORT_PHONE = "+1 (213) 595-7723";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),

@@ -438,6 +438,20 @@ const AdminPage = () => {
           description: `Shipping label created — ${packageCount} package${packageCount > 1 ? "s" : ""}`,
           location: `${form.get("senderCity")}, ${form.get("senderState")}`,
         });
+        // Notify sender + receiver via email
+        supabase.functions.invoke("send-shipment-email", {
+          body: {
+            type: "created",
+            trackingId: data.tracking_id,
+            senderName: data.sender_name,
+            senderEmail: data.sender_email,
+            receiverName: data.receiver_name,
+            receiverEmail: data.receiver_email,
+            origin: `${data.sender_city}, ${data.sender_state}`,
+            destination: `${data.receiver_city}, ${data.receiver_state}`,
+            estimatedDelivery: data.estimated_delivery_date,
+          },
+        }).catch((err) => console.error("Email notification failed:", err));
       }
       toast({ title: "Shipment Created!", description: `Tracking ID: ${trackingId}` });
       setShowCreateDialog(false);
@@ -466,6 +480,35 @@ const AdminPage = () => {
       toast({ title: "Error", description: (data as { error?: string }).error || "Failed to update", variant: "destructive" });
       setUpdatingStatus(false);
       return;
+    }
+
+    // Notify sender + receiver of status change
+    try {
+      const { data: ship } = await supabase
+        .from("shipments")
+        .select("tracking_id, sender_name, sender_email, receiver_name, receiver_email, sender_city, sender_state, receiver_city, receiver_state, estimated_delivery_date")
+        .eq("id", editingShipment.id)
+        .maybeSingle();
+      if (ship && (ship.sender_email || ship.receiver_email)) {
+        supabase.functions.invoke("send-shipment-email", {
+          body: {
+            type: "status_update",
+            trackingId: ship.tracking_id,
+            status: newStatus,
+            description: statusDescription || undefined,
+            location: statusLocation || undefined,
+            senderName: ship.sender_name,
+            senderEmail: ship.sender_email,
+            receiverName: ship.receiver_name,
+            receiverEmail: ship.receiver_email,
+            origin: `${ship.sender_city}, ${ship.sender_state}`,
+            destination: `${ship.receiver_city}, ${ship.receiver_state}`,
+            estimatedDelivery: ship.estimated_delivery_date,
+          },
+        }).catch((err) => console.error("Status email failed:", err));
+      }
+    } catch (err) {
+      console.error("Status email lookup failed:", err);
     }
 
     if (syncMapFromLocation && statusLocation.trim()) {

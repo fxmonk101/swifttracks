@@ -19,7 +19,7 @@ const CookiesPage = () => (
           { title: "Functional Cookies", content: "These cookies remember your preferences such as language, region, and display settings. They enhance your experience but are not essential for the site to work." },
           { title: "Marketing Cookies", content: "We may use marketing cookies to deliver relevant advertisements and measure campaign effectiveness. You can opt out of marketing cookies through your browser settings." },
           { title: "Managing Cookies", content: "You can control cookies through your browser settings. Most browsers allow you to block or delete cookies. Note that blocking essential cookies may affect website functionality." },
-          { title: "Contact", content: "For questions about our cookie policy, contact us at privacy@transporthaven.com or call 1-800-TRANS-HV." },
+          { title: "Contact", content: "For questions about our cookie policy, contact us at privacy@transporthaven.com or call +1 (213) 595-7723 (call or text)." },
         ].map((s) => (
           <div key={s.title} className="mb-8">
             <h2 className="font-display text-xl font-bold text-foreground mb-3">{s.title}</h2>

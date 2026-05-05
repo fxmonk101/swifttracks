@@ -17,7 +17,7 @@ const SupportPage = () => (
     <section className="container py-16">
       <div className="grid md:grid-cols-3 gap-6 mb-12">
         {[
-          { icon: Phone, title: "Call Us", desc: "1-800-TRANS-HV", sub: "Mon-Sat 8AM-8PM EST" },
+          { icon: Phone, title: "Call Us", desc: "+1 (213) 595-7723 (call or text)", sub: "Mon-Sat 8AM-8PM EST" },
           { icon: Mail, title: "Email Us", desc: "support@transporthaven.com", sub: "Response within 24 hours" },
           { icon: MessageSquare, title: "Live Chat", desc: "Chat with an agent", sub: "Available 24/7" },
         ].map((c) => (
