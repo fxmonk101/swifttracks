@@ -12,3 +12,8 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /auth
+Disallow: /driver
+
+Sitemap: https://transporthaven.com/sitemap.xml
