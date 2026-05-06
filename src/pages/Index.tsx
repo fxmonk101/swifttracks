@@ -14,15 +14,15 @@ import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import { useTranslation } from "react-i18next";
 import PageTransition from "@/components/PageTransition";
 
-import heroImage from "@/assets/hero-delivery.jpg";
-import warehouseImage from "@/assets/warehouse.jpg";
-import deliveryPersonImage from "@/assets/delivery-person.jpg";
-import mobileTrackingImage from "@/assets/mobile-tracking.jpg";
+import heroImage from "@/assets/hero-trucks.jpg";
+import warehouseImage from "@/assets/warehouse-modern.jpg";
+import deliveryPersonImage from "@/assets/delivery-handoff.png";
+import mobileTrackingImage from "@/assets/live-tracking.jpg";
 import planeImage from "@/assets/plane-flying.jpg";
-import deliveryVanImage from "@/assets/delivery-van.jpg";
+import deliveryVanImage from "@/assets/hero-land-fleet.jpg";
 import airFreightImage from "@/assets/air-freight.jpg";
-import seaFreightImage from "@/assets/sea-freight.jpg";
-import landFreightImage from "@/assets/land-freight.jpg";
+import seaFreightImage from "@/assets/hero-sea.jpg";
+import landFreightImage from "@/assets/hero-land-fleet.jpg";
 
 const Section = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
   const { ref, isVisible } = useScrollAnimation();

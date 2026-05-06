@@ -6,6 +6,9 @@ Options -MultiViews
   RewriteEngine On
   RewriteBase /
 
+  # Proxy /sitemap.xml to dynamic edge function
+  RewriteRule ^sitemap\.xml$ https://frcxvkcodspezznsoxsl.supabase.co/functions/v1/sitemap [P,L]
+
   # Don't rewrite real files / directories
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
