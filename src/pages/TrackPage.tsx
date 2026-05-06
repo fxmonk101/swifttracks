@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import TrackingMap from "@/components/TrackingMap";
+const TrackingMap = lazy(() => import("@/components/TrackingMap"));
 import Barcode from "@/components/Barcode";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
 import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
