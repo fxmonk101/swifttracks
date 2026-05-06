@@ -1,1 +1,7 @@
 project_id = "frcxvkcodspezznsoxsl"
+
+[functions.sitemap]
+verify_jwt = false
+
+[functions.send-shipment-email]
+verify_jwt = false
