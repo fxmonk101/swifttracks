@@ -319,7 +319,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(safeCurrent, animMs);
   const effectiveHeading = heading ?? computedHeading;
 
-  const [basemap, setBasemap] = useState<BasemapId>("road");
+  const [basemap, setBasemap] = useState<BasemapId>("streets");
   const [manualFitNonce, setManualFitNonce] = useState(0);
   const mapWrapRef = useRef<HTMLDivElement>(null);
 
@@ -533,14 +533,15 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
         >
           <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
 
+          {/* Single traveled route — origin → current */}
           <Polyline
             positions={traveledRoute}
-            pathOptions={{ color: "#0A2F6B", weight: 4, opacity: 0.9, lineJoin: "round", lineCap: "round" }}
+            pathOptions={{ color: "#1d4ed8", weight: 5, opacity: 0.95, lineJoin: "round", lineCap: "round" }}
           />
-
+          {/* Remaining route (dashed) — current → destination */}
           <Polyline
             positions={remainingRoute}
-            pathOptions={{ color: "#0A2F6B", weight: 3, opacity: 0.45, dashArray: "8, 8", lineCap: "round" }}
+            pathOptions={{ color: "#1d4ed8", weight: 3, opacity: 0.5, dashArray: "6, 10", lineCap: "round" }}
           />
 
           {debugOn && (

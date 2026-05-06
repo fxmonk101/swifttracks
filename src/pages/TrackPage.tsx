@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Search,
@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import TrackingMap from "@/components/TrackingMap";
+const TrackingMap = lazy(() => import("@/components/TrackingMap"));
 import Barcode from "@/components/Barcode";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
 import { getShipmentByTrackingId, routeHistory as mockRouteHistory } from "@/lib/mockData";
@@ -715,22 +715,24 @@ const TrackPage = () => {
                   </div>
                   <div className="h-[420px] relative">
                     {canShowMap ? (
-                      <TrackingMap
-                        routeHistory={mapRouteHistory}
-                        currentLocation={currentLoc}
-                        destination={destination}
-                        origin={origin}
-                        followTruck={followTruck}
-                        onFollowTruckChange={setFollowTruck}
-                        stationaryAtHold={stationaryAtHold}
-                        mapFitNonce={mapFitNonce}
-                        trackingIdForFit={shipment.trackingId}
-                        shareTrackingUrl={shareUrl}
-                        currentLocationLabel={currentLocationLabel}
-                        accuracyMeters={accuracyMeters}
-                        signalLabel={signalLabel}
-                        signalBars={signalBars}
-                      />
+                      <Suspense fallback={<div className="h-full w-full flex items-center justify-center bg-muted/30 text-muted-foreground text-sm"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                        <TrackingMap
+                          routeHistory={mapRouteHistory}
+                          currentLocation={currentLoc}
+                          destination={destination}
+                          origin={origin}
+                          followTruck={followTruck}
+                          onFollowTruckChange={setFollowTruck}
+                          stationaryAtHold={stationaryAtHold}
+                          mapFitNonce={mapFitNonce}
+                          trackingIdForFit={shipment.trackingId}
+                          shareTrackingUrl={shareUrl}
+                          currentLocationLabel={currentLocationLabel}
+                          accuracyMeters={accuracyMeters}
+                          signalLabel={signalLabel}
+                          signalBars={signalBars}
+                        />
+                      </Suspense>
                     ) : (
                       <div className="h-full w-full flex flex-col items-center justify-center bg-muted/30 text-muted-foreground text-sm p-6 text-center gap-2">
                         <Loader2 className="h-6 w-6 animate-spin" />
