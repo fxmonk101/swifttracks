@@ -9,6 +9,8 @@ import PageTransition from "@/components/PageTransition";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
 import internationalImage from "@/assets/international-shipping.jpg";
 import airFreightImage from "@/assets/air-freight.jpg";
+import seaFreightImage from "@/assets/hero-sea.jpg";
+import roadRailImage from "@/assets/hero-land-fleet.jpg";
 
 const Section = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
   const { ref, isVisible } = useScrollAnimation();
