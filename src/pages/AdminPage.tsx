@@ -310,12 +310,12 @@ const AdminPage = () => {
     const totalKm = 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
     const AVG_KMH = 88; // ~55 mph cruising
     const realSecondsPerStep = (totalKm * 0.01) / (AVG_KMH / 3600); // real-world seconds per 1%
-    // Distance-aware compression: 30x for <100km, scaling up to 240x for transcontinental.
-    const compression = Math.min(240, Math.max(30, totalKm / 8));
+    // Distance-aware compression: 20x for <100km, scaling up to 180x for transcontinental.
+    const compression = Math.min(180, Math.max(20, totalKm / 10));
     const compressed = (realSecondsPerStep / compression) * 1000;
     // Clamp per-step delay so the marker always moves at a believable cadence.
-    // Min 1.5s prevents "overspeed" (warp jumps); max 6s keeps it feeling live.
-    const delay = Math.max(1500, Math.min(6000, compressed)) / Math.max(0.5, simulationSpeed);
+    // Min 2s prevents "overspeed" (warp jumps); max 7s keeps it feeling live.
+    const delay = Math.max(2000, Math.min(7000, compressed)) / Math.max(0.5, simulationSpeed);
 
     const runSimulation = async () => {
       if (currentProgress >= 100) {
