@@ -78,8 +78,8 @@ const InternationalPage = () => {
             <div className="grid md:grid-cols-3 gap-6">
               {[
                 { icon: Plane, title: "Express Air", desc: "1-3 business days worldwide", image: airFreightImage },
-                { icon: Ship, title: "Ocean Freight", desc: "Cost-effective for large shipments" },
-                { icon: Truck, title: "Road & Rail", desc: "Cross-border ground transport" },
+                { icon: Ship, title: "Ocean Freight", desc: "Cost-effective for large shipments", image: seaFreightImage },
+                { icon: Truck, title: "Road & Rail", desc: "Cross-border ground transport", image: roadRailImage },
               ].map((s) => (
                 <Card key={s.title} className="group hover:shadow-xl transition-all hover:-translate-y-1 overflow-hidden">
                   <CardContent className="p-0">
