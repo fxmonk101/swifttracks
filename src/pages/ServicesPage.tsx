@@ -5,8 +5,8 @@ import { Zap, Truck, Globe, Shield, Clock, Package, CheckCircle, ArrowRight } fr
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import deliveryVanImage from "@/assets/delivery-van.jpg";
-import planeImage from "@/assets/plane-flying.jpg";
+import deliveryVanImage from "@/assets/hero-trucks.jpg";
+import planeImage from "@/assets/hero-land-fleet.jpg";
 
 const Section = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => {
   const { ref, isVisible } = useScrollAnimation();
