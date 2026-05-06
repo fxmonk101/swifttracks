@@ -319,7 +319,7 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   const { pos: animatedLoc, heading: computedHeading } = useAnimatedPosition(safeCurrent, animMs);
   const effectiveHeading = heading ?? computedHeading;
 
-  const [basemap, setBasemap] = useState<BasemapId>("road");
+  const [basemap, setBasemap] = useState<BasemapId>("streets");
   const [manualFitNonce, setManualFitNonce] = useState(0);
   const mapWrapRef = useRef<HTMLDivElement>(null);
 
