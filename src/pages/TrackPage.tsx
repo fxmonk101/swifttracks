@@ -785,6 +785,8 @@ const TrackPage = () => {
                           currentLocation={currentLoc}
                           destination={destination}
                           origin={origin}
+                          showRoute={false}
+                          showOriginMarker={false}
                           followTruck={followTruck}
                           onFollowTruckChange={setFollowTruck}
                           stationaryAtHold={stationaryAtHold}

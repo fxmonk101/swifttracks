@@ -265,6 +265,8 @@ export interface TrackingMapProps {
   currentLocation: Coordinates;
   destination: Coordinates;
   origin: Coordinates;
+  showRoute?: boolean;
+  showOriginMarker?: boolean;
   heading?: number;
   followTruck?: boolean;
   onFollowTruckChange?: (v: boolean) => void;
@@ -294,6 +296,8 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
   currentLocation,
   destination,
   origin,
+  showRoute = true,
+  showOriginMarker = true,
   heading,
   followTruck = false,
   onFollowTruckChange,
@@ -533,16 +537,20 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
         >
           <TileLayer key={basemap} attribution={tile.attribution} url={tile.url} />
 
-          {/* Single traveled route — origin → current */}
-          <Polyline
-            positions={traveledRoute}
-            pathOptions={{ color: "#1d4ed8", weight: 5, opacity: 0.95, lineJoin: "round", lineCap: "round" }}
-          />
-          {/* Remaining route (dashed) — current → destination */}
-          <Polyline
-            positions={remainingRoute}
-            pathOptions={{ color: "#1d4ed8", weight: 3, opacity: 0.5, dashArray: "6, 10", lineCap: "round" }}
-          />
+          {showRoute && (
+            <>
+              {/* Single traveled route — origin → current */}
+              <Polyline
+                positions={traveledRoute}
+                pathOptions={{ color: "#1d4ed8", weight: 5, opacity: 0.95, lineJoin: "round", lineCap: "round" }}
+              />
+              {/* Remaining route (dashed) — current → destination */}
+              <Polyline
+                positions={remainingRoute}
+                pathOptions={{ color: "#1d4ed8", weight: 3, opacity: 0.5, dashArray: "6, 10", lineCap: "round" }}
+              />
+            </>
+          )}
 
           {debugOn && (
             <>
@@ -574,11 +582,13 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
               ))}
             </>
           )}
-          <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
-            <Popup className="tracking-popup">
-              <div className="font-semibold text-xs">Origin</div>
-            </Popup>
-          </Marker>
+          {showOriginMarker && (
+            <Marker position={[safeOrigin.lat, safeOrigin.lng]} icon={originIcon}>
+              <Popup className="tracking-popup">
+                <div className="font-semibold text-xs">Origin</div>
+              </Popup>
+            </Marker>
+          )}
 
           <Marker
             key={`dest-${safeDestination.lat.toFixed(5)}-${safeDestination.lng.toFixed(5)}`}
