@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +16,7 @@ import {
   Map,
   Play,
   Square,
+  User,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -148,6 +150,16 @@ const AdminPage = () => {
   const [gpsAddressQuery, setGpsAddressQuery] = useState("");
   const [geocodingGps, setGeocodingGps] = useState(false);
   const [updatingGps, setUpdatingGps] = useState(false);
+  const [detailsShipment, setDetailsShipment] = useState<DBShipment | null>(null);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [receiverForm, setReceiverForm] = useState({
+    name: "",
+    street: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "US",
+  });
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [mapPreviewShipment, setMapPreviewShipment] = useState<DBShipment | null>(null);
   const [previewCoords, setPreviewCoords] = useState<{
@@ -162,6 +174,30 @@ const AdminPage = () => {
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [packageCount, setPackageCount] = useState(1);
+
+  useEffect(() => {
+    if (!detailsShipment) {
+      setReceiverForm({
+        name: "",
+        street: "",
+        city: "",
+        state: "",
+        zip: "",
+        country: "US",
+      });
+      setSavingDetails(false);
+      return;
+    }
+    setReceiverForm({
+      name: detailsShipment.receiver_name,
+      street: detailsShipment.receiver_street || "",
+      city: detailsShipment.receiver_city,
+      state: detailsShipment.receiver_state,
+      zip: detailsShipment.receiver_zip || "",
+      country: detailsShipment.receiver_country || "US",
+    });
+    setSavingDetails(false);
+  }, [detailsShipment]);
 
   const fetchShipments = async () => {
     const { data, error } = await supabase
@@ -303,6 +339,79 @@ const AdminPage = () => {
     setGpsLat(String(g.lat));
     setGpsLng(String(g.lng));
     toast({ title: "Coordinates set", description: `${g.lat.toFixed(4)}, ${g.lng.toFixed(4)}` });
+  };
+
+  const handleUpdateReceiver = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!detailsShipment) return;
+
+    const name = receiverForm.name.trim();
+    const city = receiverForm.city.trim();
+    const state = receiverForm.state.trim();
+
+    if (!name || !city || !state) {
+      toast({
+        title: "Receiver details incomplete",
+        description: "Name, city, and state are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingDetails(true);
+    const street = receiverForm.street.trim();
+    const zip = receiverForm.zip.trim();
+    const country = receiverForm.country.trim();
+
+    const { data, error } = await supabase
+      .from("shipments")
+      .update({
+        receiver_name: name,
+        receiver_street: street || null,
+        receiver_city: city,
+        receiver_state: state,
+        receiver_zip: zip || null,
+        receiver_country: country || null,
+      })
+      .eq("id", detailsShipment.id)
+      .select(
+        "id, tracking_id, service_type, status, sender_name, sender_street, sender_city, sender_state, sender_zip, sender_country, receiver_name, receiver_street, receiver_city, receiver_state, receiver_zip, receiver_country, weight, estimated_delivery_date, assigned_driver, created_at, current_lat, current_lng"
+      )
+      .maybeSingle();
+
+    if (error) {
+      toast({ title: "Error saving details", description: error.message, variant: "destructive" });
+      setSavingDetails(false);
+      return;
+    }
+
+    if (data) {
+      const updated = data as DBShipment;
+      const normalized =
+        updated.tracking_id === KAMLOOPS_OVERRIDE.trackingId
+          ? {
+              ...updated,
+              receiver_street: KAMLOOPS_OVERRIDE.street,
+              receiver_city: KAMLOOPS_OVERRIDE.city,
+              receiver_state: KAMLOOPS_OVERRIDE.state,
+              receiver_zip: KAMLOOPS_OVERRIDE.postal,
+              receiver_country: KAMLOOPS_OVERRIDE.country,
+            }
+          : updated;
+      setShipments((prev) => prev.map((s) => (s.id === normalized.id ? normalized : s)));
+      if (mapPreviewShipment && mapPreviewShipment.id === normalized.id) {
+        setMapPreviewShipment(normalized);
+      }
+      toast({
+        title: "Receiver updated",
+        description: `${normalized.tracking_id} destination saved.`,
+      });
+    } else {
+      await fetchShipments();
+    }
+
+    setDetailsShipment(null);
+    setSavingDetails(false);
   };
 
   const handleSimulateTrip = async (targetShipment?: DBShipment) => {
@@ -985,6 +1094,15 @@ const AdminPage = () => {
                           variant="ghost"
                           size="sm"
                           className="h-7 text-xs gap-1"
+                          onClick={() => setDetailsShipment(s)}
+                          disabled={isAdmin === false}
+                        >
+                          <User className="h-3 w-3" /> Details
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
                           onClick={() => {
                             setEditingShipment(s);
                             setNewStatus(s.status);
@@ -1092,6 +1210,117 @@ const AdminPage = () => {
                 )}
               </Button>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detailsShipment} onOpenChange={(open) => !open && setDetailsShipment(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">Edit Receiver Details</DialogTitle>
+          </DialogHeader>
+          {detailsShipment && (
+            <form className="space-y-4" onSubmit={handleUpdateReceiver}>
+              <div className="bg-muted/40 border border-border rounded-md p-3 text-[11px] text-muted-foreground space-y-1">
+                <p className="font-mono text-xs font-semibold text-foreground">{detailsShipment.tracking_id}</p>
+                <p>
+                  Current destination: {detailsShipment.receiver_city}, {detailsShipment.receiver_state}
+                </p>
+                {detailsShipment.tracking_id === KAMLOOPS_OVERRIDE.trackingId && (
+                  <p className="font-semibold text-secondary">
+                    Kamloops override is active — map will always use the Kamloops address.
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <Label className="text-xs">Name *</Label>
+                  <Input
+                    value={receiverForm.name}
+                    onChange={(e) => setReceiverForm((prev) => ({ ...prev, name: e.target.value }))}
+                    required
+                    className="text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-xs">Street</Label>
+                  <Input
+                    value={receiverForm.street}
+                    onChange={(e) => setReceiverForm((prev) => ({ ...prev, street: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">City *</Label>
+                  <Input
+                    value={receiverForm.city}
+                    onChange={(e) => setReceiverForm((prev) => ({ ...prev, city: e.target.value }))}
+                    required
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">State / Province *</Label>
+                  <Input
+                    value={receiverForm.state}
+                    onChange={(e) => setReceiverForm((prev) => ({ ...prev, state: e.target.value }))}
+                    required
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">ZIP / Postal</Label>
+                  <Input
+                    value={receiverForm.zip}
+                    onChange={(e) => setReceiverForm((prev) => ({ ...prev, zip: e.target.value }))}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Country</Label>
+                  <Select
+                    value={receiverForm.country}
+                    onValueChange={(value) => setReceiverForm((prev) => ({ ...prev, country: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="US">United States</SelectItem>
+                      <SelectItem value="CA">Canada</SelectItem>
+                      <SelectItem value="GB">United Kingdom</SelectItem>
+                      <SelectItem value="DE">Germany</SelectItem>
+                      <SelectItem value="FR">France</SelectItem>
+                      <SelectItem value="ES">Spain</SelectItem>
+                      <SelectItem value="IT">Italy</SelectItem>
+                      <SelectItem value="JP">Japan</SelectItem>
+                      <SelectItem value="CN">China</SelectItem>
+                      <SelectItem value="AU">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setDetailsShipment(null)}
+                  disabled={savingDetails}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1 bg-primary text-primary-foreground" disabled={savingDetails}>
+                  {savingDetails ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving…
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </form>
           )}
         </DialogContent>
       </Dialog>
