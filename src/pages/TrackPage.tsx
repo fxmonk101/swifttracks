@@ -50,15 +50,17 @@ type DBShipment = {
   service_type: string;
   status: string;
   sender_name: string;
+  sender_street: string | null;
   sender_city: string;
   sender_state: string;
-  sender_street: string | null;
   sender_zip: string | null;
+  sender_country: string | null;
   receiver_name: string;
+  receiver_street: string | null;
   receiver_city: string;
   receiver_state: string;
-  receiver_street: string | null;
   receiver_zip: string | null;
+  receiver_country: string | null;
   weight: number | null;
   dimensions_length: number | null;
   dimensions_width: number | null;
@@ -81,6 +83,25 @@ type DBEvent = {
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : (v as number);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const normalizeCountry = (country?: string | null): string => {
+  if (!country) return "";
+  const trimmed = country.trim();
+  if (!trimmed) return "";
+  const up = trimmed.toUpperCase();
+  if (up === "US" || up === "USA") return "USA";
+  if (up === "CA" || up === "CAN" || up === "CANADA") return "Canada";
+  return trimmed;
+};
+
+const KAMLOOPS_OVERRIDE = {
+  trackingId: "TH-2026-03M1J438",
+  street: "55-383 Columbia Street West",
+  city: "Kamloops",
+  state: "BC",
+  postal: "V2C 1K5",
+  country: "CA",
 };
 
 function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
@@ -221,7 +242,18 @@ const TrackPage = () => {
       if (sErr) console.error("[TrackPage] shipment fetch error:", sErr);
 
       if (shipment) {
-        setDbShipment(shipment as DBShipment);
+        const normalized: DBShipment =
+          shipment.tracking_id === KAMLOOPS_OVERRIDE.trackingId
+            ? {
+                ...(shipment as DBShipment),
+                receiver_street: KAMLOOPS_OVERRIDE.street,
+                receiver_city: KAMLOOPS_OVERRIDE.city,
+                receiver_state: KAMLOOPS_OVERRIDE.state,
+                receiver_zip: KAMLOOPS_OVERRIDE.postal,
+                receiver_country: KAMLOOPS_OVERRIDE.country,
+              }
+            : (shipment as DBShipment);
+        setDbShipment(normalized);
         await loadEvents(shipment.id);
         await loadSnapshots(shipment.id);
 
@@ -233,7 +265,19 @@ const TrackPage = () => {
             (payload) => {
               const n = payload.new as DBShipment;
               const o = (payload as { old?: Partial<DBShipment> }).old;
+              const next =
+                n.tracking_id === KAMLOOPS_OVERRIDE.trackingId
+                  ? {
+                      ...n,
+                      receiver_street: KAMLOOPS_OVERRIDE.street,
+                      receiver_city: KAMLOOPS_OVERRIDE.city,
+                      receiver_state: KAMLOOPS_OVERRIDE.state,
+                      receiver_zip: KAMLOOPS_OVERRIDE.postal,
+                      receiver_country: KAMLOOPS_OVERRIDE.country,
+                    }
+                  : n;
               setDbShipment(n);
+              setDbShipment(next);
               if (o && n.status !== o.status) {
                 toast({
                   title: "Shipment updated",
@@ -311,7 +355,7 @@ const TrackPage = () => {
           city: dbShipment.sender_city,
           state: dbShipment.sender_state,
           zip: dbShipment.sender_zip || "",
-          country: "US",
+          country: dbShipment.sender_country || "US",
         },
         receiver: {
           name: dbShipment.receiver_name,
@@ -319,7 +363,7 @@ const TrackPage = () => {
           city: dbShipment.receiver_city,
           state: dbShipment.receiver_state,
           zip: dbShipment.receiver_zip || "",
-          country: "US",
+          country: dbShipment.receiver_country || "US",
         },
         weight: num(dbShipment.weight),
         dimensions: {
@@ -369,9 +413,17 @@ const TrackPage = () => {
     let cancelled = false;
     setGeoLoading(true);
     (async () => {
-      const buildQuery = (s: { street: string; city: string; state: string; zip: string }) => {
-        const parts = [s.city, s.state, s.zip, "USA"].filter(Boolean);
-        return parts.join(", ");
+      const buildQuery = (s: { street: string; city: string; state: string; zip: string; country: string }) => {
+        const segments = [s.street, s.city, s.state, s.zip, normalizeCountry(s.country) || "USA"]
+          .map((seg) => seg?.trim())
+          .filter((seg) => !!seg) as string[];
+        const unique: string[] = [];
+        for (const seg of segments) {
+          if (!unique.some((existing) => existing.toLowerCase() === seg.toLowerCase())) {
+            unique.push(seg);
+          }
+        }
+        return unique.join(", ");
       };
       const [o, d] = await Promise.all([
         geocode(buildQuery(shipment.sender)),
@@ -387,7 +439,19 @@ const TrackPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [shipment?.id, shipment?.sender.city, shipment?.receiver.city]);
+  }, [
+    shipment?.id,
+    shipment?.sender.street,
+    shipment?.sender.city,
+    shipment?.sender.state,
+    shipment?.sender.zip,
+    shipment?.sender.country,
+    shipment?.receiver.street,
+    shipment?.receiver.city,
+    shipment?.receiver.state,
+    shipment?.receiver.zip,
+    shipment?.receiver.country,
+  ]);
 
   // Calculate speed and ETA whenever shipment location or status changes
   useEffect(() => {

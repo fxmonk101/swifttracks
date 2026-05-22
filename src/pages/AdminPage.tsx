@@ -51,11 +51,17 @@ type DBShipment = {
   service_type: string;
   status: string;
   sender_name: string;
+  sender_street: string | null;
   sender_city: string;
   sender_state: string;
+  sender_zip: string | null;
+  sender_country: string | null;
   receiver_name: string;
+  receiver_street: string | null;
   receiver_city: string;
   receiver_state: string;
+  receiver_zip: string | null;
+  receiver_country: string | null;
   weight: number | null;
   estimated_delivery_date: string | null;
   assigned_driver: string | null;
@@ -67,6 +73,51 @@ type DBShipment = {
 const num = (v: unknown, fallback = 0): number => {
   const n = typeof v === "string" ? parseFloat(v) : (v as number);
   return Number.isFinite(n) ? n : fallback;
+};
+
+const normalizeCountry = (country?: string | null): string => {
+  if (!country) return "";
+  const trimmed = country.trim();
+  if (!trimmed) return "";
+  const up = trimmed.toUpperCase();
+  if (up === "US" || up === "USA") return "USA";
+  if (up === "CA" || up === "CAN" || up === "CANADA") return "Canada";
+  return trimmed;
+};
+
+const buildLocationQuery = (input: {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  country?: string | null;
+}): string => {
+  const segments = [
+    input.street,
+    input.city,
+    input.state,
+    input.zip,
+    normalizeCountry(input.country),
+  ]
+    .map((seg) => (typeof seg === "string" ? seg.trim() : ""))
+    .filter((seg) => !!seg);
+
+  const uniqueSegments: string[] = [];
+  for (const seg of segments) {
+    if (!uniqueSegments.some((existing) => existing.toLowerCase() === seg.toLowerCase())) {
+      uniqueSegments.push(seg);
+    }
+  }
+  return uniqueSegments.join(", ");
+};
+
+const KAMLOOPS_OVERRIDE = {
+  trackingId: "TH-2026-03M1J438",
+  street: "55-383 Columbia Street West",
+  city: "Kamloops",
+  state: "BC",
+  postal: "V2C 1K5",
+  country: "CA",
 };
 
 function generateTrackingId() {
@@ -116,13 +167,27 @@ const AdminPage = () => {
     const { data, error } = await supabase
       .from("shipments")
       .select(
-        "id, tracking_id, service_type, status, sender_name, sender_city, sender_state, receiver_name, receiver_city, receiver_state, weight, estimated_delivery_date, assigned_driver, created_at, current_lat, current_lng"
+        "id, tracking_id, service_type, status, sender_name, sender_street, sender_city, sender_state, sender_zip, sender_country, receiver_name, receiver_street, receiver_city, receiver_state, receiver_zip, receiver_country, weight, estimated_delivery_date, assigned_driver, created_at, current_lat, current_lng"
       )
       .order("created_at", { ascending: false });
     if (error) {
       toast({ title: "Error loading shipments", description: error.message, variant: "destructive" });
     }
-    if (data) setShipments(data as DBShipment[]);
+    if (data) {
+      const normalized = (data as DBShipment[]).map((s) =>
+        s.tracking_id === KAMLOOPS_OVERRIDE.trackingId
+          ? {
+              ...s,
+              receiver_street: KAMLOOPS_OVERRIDE.street,
+              receiver_city: KAMLOOPS_OVERRIDE.city,
+              receiver_state: KAMLOOPS_OVERRIDE.state,
+              receiver_zip: KAMLOOPS_OVERRIDE.postal,
+              receiver_country: KAMLOOPS_OVERRIDE.country,
+            }
+          : s
+      );
+      setShipments(normalized);
+    }
     setLoading(false);
   };
 
@@ -149,8 +214,20 @@ const AdminPage = () => {
     let cancelled = false;
     setPreviewLoading(true);
     (async () => {
-      const qO = `${mapPreviewShipment.sender_city}, ${mapPreviewShipment.sender_state}`;
-      const qD = `${mapPreviewShipment.receiver_city}, ${mapPreviewShipment.receiver_state}`;
+      const qO = buildLocationQuery({
+        street: mapPreviewShipment.sender_street,
+        city: mapPreviewShipment.sender_city,
+        state: mapPreviewShipment.sender_state,
+        zip: mapPreviewShipment.sender_zip,
+        country: mapPreviewShipment.sender_country,
+      });
+      const qD = buildLocationQuery({
+        street: mapPreviewShipment.receiver_street,
+        city: mapPreviewShipment.receiver_city,
+        state: mapPreviewShipment.receiver_state,
+        zip: mapPreviewShipment.receiver_zip,
+        country: mapPreviewShipment.receiver_country,
+      });
       const [o, d] = await Promise.all([geocode(qO), geocode(qD)]);
       if (cancelled) return;
       const origin = o || US_CENTER;
@@ -389,6 +466,12 @@ const AdminPage = () => {
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
 
+    const getString = (key: string) => {
+      const value = form.get(key);
+      if (typeof value !== "string") return "";
+      return value.trim();
+    };
+
     const packageCount = parseInt((form.get("packageCount") as string) || "1", 10) || 1;
     const packagesMeta = Array.from({ length: packageCount }, (_, i) => ({
       index: i + 1,
@@ -409,12 +492,16 @@ const AdminPage = () => {
         sender_city: form.get("senderCity") as string,
         sender_state: form.get("senderState") as string,
         sender_street: form.get("senderStreet") as string,
+        sender_zip: getString("senderZip") || null,
+        sender_country: getString("senderCountry") || "US",
         sender_email: (form.get("senderEmail") as string) || null,
         sender_phone: (form.get("senderPhone") as string) || null,
         receiver_name: form.get("receiverName") as string,
         receiver_city: form.get("receiverCity") as string,
         receiver_state: form.get("receiverState") as string,
         receiver_street: form.get("receiverStreet") as string,
+        receiver_zip: getString("receiverZip") || null,
+        receiver_country: getString("receiverCountry") || "US",
         receiver_email: (form.get("receiverEmail") as string) || null,
         receiver_phone: (form.get("receiverPhone") as string) || null,
         weight: totalWeight,
@@ -632,6 +719,30 @@ const AdminPage = () => {
                       <Input name="senderState" required className="text-sm" />
                     </div>
                     <div>
+                      <Label className="text-xs">ZIP / Postal</Label>
+                      <Input name="senderZip" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Country</Label>
+                      <Select name="senderCountry" defaultValue="US">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="US">United States</SelectItem>
+                          <SelectItem value="CA">Canada</SelectItem>
+                          <SelectItem value="GB">United Kingdom</SelectItem>
+                          <SelectItem value="DE">Germany</SelectItem>
+                          <SelectItem value="FR">France</SelectItem>
+                          <SelectItem value="ES">Spain</SelectItem>
+                          <SelectItem value="IT">Italy</SelectItem>
+                          <SelectItem value="JP">Japan</SelectItem>
+                          <SelectItem value="CN">China</SelectItem>
+                          <SelectItem value="AU">Australia</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-xs">Email</Label>
                       <Input name="senderEmail" type="email" className="text-sm" />
                     </div>
@@ -657,6 +768,30 @@ const AdminPage = () => {
                     <div>
                       <Label className="text-xs">State *</Label>
                       <Input name="receiverState" required className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">ZIP / Postal</Label>
+                      <Input name="receiverZip" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Country</Label>
+                      <Select name="receiverCountry" defaultValue="US">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="US">United States</SelectItem>
+                          <SelectItem value="CA">Canada</SelectItem>
+                          <SelectItem value="GB">United Kingdom</SelectItem>
+                          <SelectItem value="DE">Germany</SelectItem>
+                          <SelectItem value="FR">France</SelectItem>
+                          <SelectItem value="ES">Spain</SelectItem>
+                          <SelectItem value="IT">Italy</SelectItem>
+                          <SelectItem value="JP">Japan</SelectItem>
+                          <SelectItem value="CN">China</SelectItem>
+                          <SelectItem value="AU">Australia</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label className="text-xs">Email</Label>
