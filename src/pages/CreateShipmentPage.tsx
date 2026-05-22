@@ -13,48 +13,79 @@ import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import { useToast } from "@/hooks/use-toast";
 
-const AddressFields = ({ prefix, t }: { prefix: string; t: (k: string) => string }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div className="md:col-span-2">
-      <Label>{t("createShipment.name")}</Label>
-      <Input placeholder={t("createShipment.name")} />
+interface AddressFieldsProps {
+  prefix: string;
+  t: (k: string) => string;
+  isReceiver?: boolean;
+}
+
+const AddressFields = ({ prefix, t, isReceiver }: AddressFieldsProps) => {
+  // Default Canada address for receiver
+  const defaultCountry = isReceiver ? "CA" : "US";
+  const defaultStreet = isReceiver ? "55-383 Columbia Street West" : "";
+  const defaultCity = isReceiver ? "Kamloops" : "";
+  const defaultState = isReceiver ? "BC" : "";
+  const defaultZip = isReceiver ? "V2C 1K5" : "";
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="md:col-span-2">
+        <Label>{t("createShipment.name")}</Label>
+        <Input placeholder={t("createShipment.name")} name={`${prefix}Name`} />
+      </div>
+      <div className="md:col-span-2">
+        <Label>{t("createShipment.street")}</Label>
+        <Input 
+          placeholder={t("createShipment.street")} 
+          name={`${prefix}Street`}
+          defaultValue={defaultStreet}
+        />
+      </div>
+      <div>
+        <Label>{t("createShipment.city")}</Label>
+        <Input 
+          placeholder={t("createShipment.city")} 
+          name={`${prefix}City`}
+          defaultValue={defaultCity}
+        />
+      </div>
+      <div>
+        <Label>{t("createShipment.state")}</Label>
+        <Input 
+          placeholder={t("createShipment.state")} 
+          name={`${prefix}State`}
+          defaultValue={defaultState}
+        />
+      </div>
+      <div>
+        <Label>{t("createShipment.zip")}</Label>
+        <Input 
+          placeholder={t("createShipment.zip")} 
+          name={`${prefix}Zip`}
+          defaultValue={defaultZip}
+        />
+      </div>
+      <div>
+        <Label>{t("createShipment.country")}</Label>
+        <Select defaultValue={defaultCountry} name={`${prefix}Country`}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="US">United States</SelectItem>
+            <SelectItem value="CA">Canada</SelectItem>
+            <SelectItem value="GB">United Kingdom</SelectItem>
+            <SelectItem value="DE">Germany</SelectItem>
+            <SelectItem value="FR">France</SelectItem>
+            <SelectItem value="ES">Spain</SelectItem>
+            <SelectItem value="IT">Italy</SelectItem>
+            <SelectItem value="JP">Japan</SelectItem>
+            <SelectItem value="CN">China</SelectItem>
+            <SelectItem value="AU">Australia</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
-    <div className="md:col-span-2">
-      <Label>{t("createShipment.street")}</Label>
-      <Input placeholder={t("createShipment.street")} />
-    </div>
-    <div>
-      <Label>{t("createShipment.city")}</Label>
-      <Input placeholder={t("createShipment.city")} />
-    </div>
-    <div>
-      <Label>{t("createShipment.state")}</Label>
-      <Input placeholder={t("createShipment.state")} />
-    </div>
-    <div>
-      <Label>{t("createShipment.zip")}</Label>
-      <Input placeholder={t("createShipment.zip")} />
-    </div>
-    <div>
-      <Label>{t("createShipment.country")}</Label>
-      <Select defaultValue="US">
-        <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="US">United States</SelectItem>
-          <SelectItem value="CA">Canada</SelectItem>
-          <SelectItem value="GB">United Kingdom</SelectItem>
-          <SelectItem value="DE">Germany</SelectItem>
-          <SelectItem value="FR">France</SelectItem>
-          <SelectItem value="ES">Spain</SelectItem>
-          <SelectItem value="IT">Italy</SelectItem>
-          <SelectItem value="JP">Japan</SelectItem>
-          <SelectItem value="CN">China</SelectItem>
-          <SelectItem value="AU">Australia</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-);
+  );
+};
 
 const CreateShipmentPage = () => {
   const { t } = useTranslation();
@@ -134,9 +165,10 @@ const CreateShipmentPage = () => {
                     <MapPin className="h-5 w-5 text-primary" />
                     {t("createShipment.receiverInfo")}
                   </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-2">Default: Canada (55-383 Columbia Street West, Kamloops BC)</p>
                 </CardHeader>
                 <CardContent>
-                  <AddressFields prefix="receiver" t={t} />
+                  <AddressFields prefix="receiver" t={t} isReceiver={true} />
                   <div className="flex gap-3 mt-6">
                     <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
                     <Button onClick={() => setStep(3)} className="bg-primary hover:bg-primary/90 font-display font-bold">
@@ -159,11 +191,11 @@ const CreateShipmentPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>{t("createShipment.weight")}</Label>
-                      <Input type="number" placeholder="0.0" min="0" step="0.1" />
+                      <Input type="number" placeholder="0.0" min="0" step="0.1" name="weight" />
                     </div>
                     <div>
                       <Label>{t("createShipment.serviceType")}</Label>
-                      <Select defaultValue="STANDARD">
+                      <Select defaultValue="STANDARD" name="serviceType">
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="EXPRESS">{t("createShipment.express")}</SelectItem>
@@ -175,23 +207,23 @@ const CreateShipmentPage = () => {
                     </div>
                     <div>
                       <Label>{t("createShipment.length")}</Label>
-                      <Input type="number" placeholder="0" min="0" />
+                      <Input type="number" placeholder="0" min="0" name="length" />
                     </div>
                     <div>
                       <Label>{t("createShipment.width")}</Label>
-                      <Input type="number" placeholder="0" min="0" />
+                      <Input type="number" placeholder="0" min="0" name="width" />
                     </div>
                     <div>
                       <Label>{t("createShipment.height")}</Label>
-                      <Input type="number" placeholder="0" min="0" />
+                      <Input type="number" placeholder="0" min="0" name="height" />
                     </div>
                     <div className="flex items-center gap-2 mt-6">
-                      <Checkbox id="signature" />
+                      <Checkbox id="signature" name="signature" />
                       <Label htmlFor="signature">{t("createShipment.signatureRequired")}</Label>
                     </div>
                     <div className="md:col-span-2">
                       <Label>{t("createShipment.description")}</Label>
-                      <Textarea placeholder={t("createShipment.description")} />
+                      <Textarea placeholder={t("createShipment.description")} name="description" />
                     </div>
                   </div>
                   <div className="flex gap-3 mt-6">
