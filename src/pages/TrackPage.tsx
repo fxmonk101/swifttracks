@@ -104,6 +104,24 @@ const KAMLOOPS_OVERRIDE = {
   country: "CA",
 };
 
+const BURNABY_TO_CALGARY_OVERRIDE = {
+  trackingId: "TH-2026-R9PZ36QK",
+  sender: {
+    street: "7552 Chutter St",
+    city: "Burnaby",
+    state: "BC",
+    postal: "V5A 2A3",
+    country: "CA",
+  },
+  receiver: {
+    street: "309-525 3 Ave SW",
+    city: "Calgary",
+    state: "AB",
+    postal: "T2P 0G4",
+    country: "CA",
+  },
+};
+
 function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371008;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -252,6 +270,20 @@ const TrackPage = () => {
                 receiver_zip: KAMLOOPS_OVERRIDE.postal,
                 receiver_country: KAMLOOPS_OVERRIDE.country,
               }
+            : shipment.tracking_id === BURNABY_TO_CALGARY_OVERRIDE.trackingId
+            ? {
+                ...(shipment as DBShipment),
+                sender_street: BURNABY_TO_CALGARY_OVERRIDE.sender.street,
+                sender_city: BURNABY_TO_CALGARY_OVERRIDE.sender.city,
+                sender_state: BURNABY_TO_CALGARY_OVERRIDE.sender.state,
+                sender_zip: BURNABY_TO_CALGARY_OVERRIDE.sender.postal,
+                sender_country: BURNABY_TO_CALGARY_OVERRIDE.sender.country,
+                receiver_street: BURNABY_TO_CALGARY_OVERRIDE.receiver.street,
+                receiver_city: BURNABY_TO_CALGARY_OVERRIDE.receiver.city,
+                receiver_state: BURNABY_TO_CALGARY_OVERRIDE.receiver.state,
+                receiver_zip: BURNABY_TO_CALGARY_OVERRIDE.receiver.postal,
+                receiver_country: BURNABY_TO_CALGARY_OVERRIDE.receiver.country,
+              }
             : (shipment as DBShipment);
         setDbShipment(normalized);
         await loadEvents(shipment.id);
@@ -274,6 +306,20 @@ const TrackPage = () => {
                       receiver_state: KAMLOOPS_OVERRIDE.state,
                       receiver_zip: KAMLOOPS_OVERRIDE.postal,
                       receiver_country: KAMLOOPS_OVERRIDE.country,
+                    }
+                  : n.tracking_id === BURNABY_TO_CALGARY_OVERRIDE.trackingId
+                  ? {
+                      ...n,
+                      sender_street: BURNABY_TO_CALGARY_OVERRIDE.sender.street,
+                      sender_city: BURNABY_TO_CALGARY_OVERRIDE.sender.city,
+                      sender_state: BURNABY_TO_CALGARY_OVERRIDE.sender.state,
+                      sender_zip: BURNABY_TO_CALGARY_OVERRIDE.sender.postal,
+                      sender_country: BURNABY_TO_CALGARY_OVERRIDE.sender.country,
+                      receiver_street: BURNABY_TO_CALGARY_OVERRIDE.receiver.street,
+                      receiver_city: BURNABY_TO_CALGARY_OVERRIDE.receiver.city,
+                      receiver_state: BURNABY_TO_CALGARY_OVERRIDE.receiver.state,
+                      receiver_zip: BURNABY_TO_CALGARY_OVERRIDE.receiver.postal,
+                      receiver_country: BURNABY_TO_CALGARY_OVERRIDE.receiver.country,
                     }
                   : n;
               setDbShipment(n);
