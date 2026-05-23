@@ -127,6 +127,17 @@ export const mockDrivers: Driver[] = [
 
 export const routeHistory = routePoints;
 
+// Route from Burnaby, BC to Calgary, AB for tracking TH-2026-R9PZ36QK
+export const burnabayToCalgaryRoute: Coordinates[] = [
+  { lat: 49.2827, lng: -122.9955 }, // Burnaby, BC start
+  { lat: 49.5, lng: -121.5 },       // Intermediate point
+  { lat: 49.8, lng: -120.0 },       // Intermediate point
+  { lat: 50.2, lng: -118.5 },       // Intermediate point
+  { lat: 50.5, lng: -117.0 },       // Current location (midpoint)
+  { lat: 50.8, lng: -115.5 },       // Intermediate point
+  { lat: 51.0537, lng: -114.0823 }, // Calgary, AB destination
+];
+
 export function getShipmentByTrackingId(trackingId: string): Shipment | undefined {
   return mockShipments.find((s) => s.trackingId.toLowerCase() === trackingId.toLowerCase());
 }
