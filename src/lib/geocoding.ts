@@ -49,6 +49,14 @@ const STATIC: Record<string, Coordinates> = {
   "55-383 columbia street west kamloops": { lat: 50.6764, lng: -120.3396 },
   "55-383 columbia st w kamloops bc": { lat: 50.6764, lng: -120.3396 },
   "kamloops bc": { lat: 50.6745, lng: -120.3273 },
+  "burnaby bc": { lat: 49.2827, lng: -122.9955 },
+  "burnaby": { lat: 49.2827, lng: -122.9955 },
+  "7552 chutter st burnaby bc": { lat: 49.2827, lng: -122.9955 },
+  "7552 chutter st burnaby": { lat: 49.2827, lng: -122.9955 },
+  "calgary ab": { lat: 51.0537, lng: -114.0823 },
+  "calgary": { lat: 51.0537, lng: -114.0823 },
+  "309-525 3 ave sw calgary ab": { lat: 51.0537, lng: -114.0823 },
+  "309-525 3 ave sw calgary": { lat: 51.0537, lng: -114.0823 },
 };
 
 const fuzzyStatic = (query: string): Coordinates | null => {
