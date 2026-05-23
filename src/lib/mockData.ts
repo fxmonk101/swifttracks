@@ -117,7 +117,45 @@ export const mockShipments: Shipment[] = [
     ],
     createdAt: "2026-05-23T09:00:00Z",
   },
-];
+  {
+    id: "6",
+    trackingId: "TH-2026-3C3MLEDD",
+    serviceType: "STANDARD",
+    status: "IN_TRANSIT",
+    sender: { name: "Sender", street: "3920 Dismal Swamp Trail", city: "Chesapeake", state: "VA", zip: "23322", country: "US" },
+    receiver: { name: "Recipient", street: "3247 Island Cree Rd", city: "Huddleston", state: "VA", zip: "24104", country: "US" },
+    weight: 1.5,
+    dimensions: { length: 25, width: 18, height: 12 },
+    requiresSignature: false,
+    estimatedDeliveryDate: "2026-05-25T18:00:00Z",
+    currentLocation: { lat: 37.5, lng: -78.0 },
+    assignedDriver: "d1",
+    events: [
+      { status: "LABEL_CREATED", description: "Shipping label created", location: "Chesapeake, VA", timestamp: "2026-05-23T08:00:00Z" },
+      { status: "PICKED_UP", description: "Package picked up by courier", location: "Chesapeake, VA", timestamp: "2026-05-23T13:00:00Z" },
+      { status: "IN_TRANSIT", description: "Package in transit from Chesapeake to Huddleston", location: "Chesapeake, VA", timestamp: "2026-05-23T16:00:00Z" },
+    ],
+    createdAt: "2026-05-23T08:00:00Z",
+  },  {
+    id: "6",
+    trackingId: "TH-2026-3C3MLEDD",
+    serviceType: "STANDARD",
+    status: "IN_TRANSIT",
+    sender: { name: "Sender", street: "3920 Dismal Swamp Trail", city: "Chesapeake", state: "VA", zip: "23322", country: "US" },
+    receiver: { name: "Recipient", street: "3247 Island Cree Rd", city: "Huddleston", state: "VA", zip: "24104", country: "US" },
+    weight: 1.5,
+    dimensions: { length: 25, width: 18, height: 12 },
+    requiresSignature: false,
+    estimatedDeliveryDate: "2026-05-25T18:00:00Z",
+    currentLocation: { lat: 37.2, lng: -77.5 },
+    assignedDriver: "d1",
+    events: [
+      { status: "LABEL_CREATED", description: "Shipping label created", location: "Chesapeake, VA", timestamp: "2026-05-23T08:00:00Z" },
+      { status: "PICKED_UP", description: "Package picked up by courier", location: "Chesapeake, VA", timestamp: "2026-05-23T13:00:00Z" },
+      { status: "IN_TRANSIT", description: "Package in transit from Chesapeake to Huddleston", location: "Chesapeake, VA", timestamp: "2026-05-23T16:00:00Z" },
+    ],
+    createdAt: "2026-05-23T08:00:00Z",
+  },];
 
 export const mockDrivers: Driver[] = [
   { id: "d1", name: "Marcus Johnson", email: "marcus@transporthaven.com", phone: "+1555-0101", onDuty: true, currentLocation: { lat: 39.2904, lng: -76.6122 }, accuracy: 12, speed: 45, heading: 210, activeShipments: ["ST-2024-AB3F7K9M"] },

@@ -122,6 +122,24 @@ const BURNABY_TO_CALGARY_OVERRIDE = {
   },
 };
 
+const CHESAPEAKE_TO_HUDDLESTON_OVERRIDE = {
+  trackingId: "TH-2026-3C3MLEDD",
+  sender: {
+    street: "3920 Dismal Swamp Trail",
+    city: "Chesapeake",
+    state: "VA",
+    postal: "23322",
+    country: "US",
+  },
+  receiver: {
+    street: "3247 Island Cree Rd",
+    city: "Huddleston",
+    state: "VA",
+    postal: "24104",
+    country: "US",
+  },
+};
+
 function haversineMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371008;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
@@ -290,6 +308,20 @@ const TrackPage = () => {
                 receiver_zip: BURNABY_TO_CALGARY_OVERRIDE.receiver.postal,
                 receiver_country: BURNABY_TO_CALGARY_OVERRIDE.receiver.country,
               }
+            : shipment.tracking_id === CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.trackingId
+            ? {
+                ...(shipment as DBShipment),
+                sender_street: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.street,
+                sender_city: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.city,
+                sender_state: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.state,
+                sender_zip: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.postal,
+                sender_country: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.country,
+                receiver_street: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.street,
+                receiver_city: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.city,
+                receiver_state: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.state,
+                receiver_zip: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.postal,
+                receiver_country: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.country,
+              }
             : (shipment as DBShipment);
         setDbShipment(normalized);
         await loadEvents(shipment.id);
@@ -326,6 +358,20 @@ const TrackPage = () => {
                       receiver_state: BURNABY_TO_CALGARY_OVERRIDE.receiver.state,
                       receiver_zip: BURNABY_TO_CALGARY_OVERRIDE.receiver.postal,
                       receiver_country: BURNABY_TO_CALGARY_OVERRIDE.receiver.country,
+                    }
+                  : n.tracking_id === CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.trackingId
+                  ? {
+                      ...n,
+                      sender_street: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.street,
+                      sender_city: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.city,
+                      sender_state: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.state,
+                      sender_zip: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.postal,
+                      sender_country: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.sender.country,
+                      receiver_street: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.street,
+                      receiver_city: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.city,
+                      receiver_state: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.state,
+                      receiver_zip: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.postal,
+                      receiver_country: CHESAPEAKE_TO_HUDDLESTON_OVERRIDE.receiver.country,
                     }
                   : n;
               setDbShipment(n);
