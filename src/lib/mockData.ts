@@ -97,6 +97,26 @@ export const mockShipments: Shipment[] = [
     ],
     createdAt: "2024-12-16T09:00:00Z",
   },
+  {
+    id: "5",
+    trackingId: "TH-2026-R9PZ36QK",
+    serviceType: "EXPRESS",
+    status: "IN_TRANSIT",
+    sender: { name: "Sender", street: "7552 Chutter St", city: "Burnaby", state: "BC", zip: "V5A 2A3", country: "Canada" },
+    receiver: { name: "Recipient", street: "309-525 3 Ave SW", city: "Calgary", state: "AB", zip: "T2P 0G4", country: "Canada" },
+    weight: 2.0,
+    dimensions: { length: 30, width: 20, height: 15 },
+    requiresSignature: false,
+    estimatedDeliveryDate: "2026-05-26T18:00:00Z",
+    currentLocation: { lat: 50.5, lng: -118.5 },
+    assignedDriver: "d2",
+    events: [
+      { status: "LABEL_CREATED", description: "Shipping label created", location: "Burnaby, BC", timestamp: "2026-05-23T09:00:00Z" },
+      { status: "PICKED_UP", description: "Package picked up by courier", location: "Burnaby, BC", timestamp: "2026-05-23T14:30:00Z" },
+      { status: "IN_TRANSIT", description: "Package in transit from Burnaby to Calgary", location: "Burnaby, BC", timestamp: "2026-05-23T18:00:00Z" },
+    ],
+    createdAt: "2026-05-23T09:00:00Z",
+  },
 ];
 
 export const mockDrivers: Driver[] = [

@@ -453,6 +453,11 @@ const TrackPage = () => {
     shipment?.receiver.country,
   ]);
 
+  useEffect(() => {
+    if (!coords) return;
+    setMapFitNonce((n) => n + 1);
+  }, [coords?.origin.lat, coords?.origin.lng, coords?.destination.lat, coords?.destination.lng]);
+
   // Calculate speed and ETA whenever shipment location or status changes
   useEffect(() => {
     if (!shipment || !isDB) {

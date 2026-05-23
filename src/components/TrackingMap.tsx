@@ -188,12 +188,20 @@ const MapAutoFit = ({ points, trackingIdForFit, mapFitNonce, manualFitNonce, bas
   const pointsRef = useRef(points);
   pointsRef.current = points;
 
+  const pointsSignature = useMemo(
+    () =>
+      points
+        .map((p) => `${Number.isFinite(p.lat) ? p.lat.toFixed(6) : "nan"}:${Number.isFinite(p.lng) ? p.lng.toFixed(6) : "nan"}`)
+        .join("|"),
+    [points]
+  );
+
   useEffect(() => {
     const pts = pointsRef.current;
     if (pts.length === 0) return;
     const bounds = L.latLngBounds(pts.map((p) => [p.lat, p.lng]));
     map.fitBounds(bounds, { padding: [56, 56], animate: true, duration: 0.45 });
-  }, [map, trackingIdForFit, mapFitNonce, manualFitNonce, basemap]);
+  }, [map, trackingIdForFit, mapFitNonce, manualFitNonce, basemap, pointsSignature]);
 
   return null;
 };
@@ -417,10 +425,21 @@ const TrackingMap = forwardRef<HTMLDivElement, TrackingMapProps>(({
     [animatedLoc.lat, animatedLoc.lng, safeDestination.lat, safeDestination.lng]
   );
 
-  const fitPoints = useMemo(
-    () => [safeOrigin, ...safeHistory, safeCurrent, safeDestination].filter(isFiniteCoord),
-    [safeOrigin, safeHistory, safeCurrent, safeDestination]
-  );
+  const fitPoints = useMemo(() => {
+    const base = showRoute
+      ? [safeOrigin, ...safeHistory, safeCurrent, safeDestination]
+      : [safeOrigin, safeCurrent, safeDestination];
+    const seen = new Set<string>();
+    const cleaned: Coordinates[] = [];
+    for (const p of base) {
+      if (!isFiniteCoord(p)) continue;
+      const key = `${p.lat.toFixed(6)}:${p.lng.toFixed(6)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      cleaned.push(p);
+    }
+    return cleaned;
+  }, [showRoute, safeOrigin, safeHistory, safeCurrent, safeDestination]);
 
   const tile = BASEMAPS[basemap];
 
