@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 const TrackingMap = lazy(() => import("@/components/TrackingMap"));
 import Barcode from "@/components/Barcode";
 import TrackingProgressBar from "@/components/TrackingProgressBar";
-import { getShipmentByTrackingId, routeHistory as mockRouteHistory, burnabayToCalgaryRoute } from "@/lib/mockData";
+import { getShipmentByTrackingId, routeHistory as mockRouteHistory, burnabayToCalgaryRoute, chesapeakeToHuddlestonRoute } from "@/lib/mockData";
 import { STATUS_LABELS, ShipmentStatus, Shipment, Coordinates } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import AppHeader from "@/components/AppHeader";
@@ -254,6 +254,12 @@ const TrackPage = () => {
       // For mock Burnaby to Calgary route, inject route points
       if (id === "TH-2026-R9PZ36QK") {
         setLocationRouteHistory(burnabayToCalgaryRoute);
+        return;
+      }
+      
+      // For mock Chesapeake to Huddleston route, inject route points
+      if (id === "TH-2026-3C3MLEDD") {
+        setLocationRouteHistory(chesapeakeToHuddlestonRoute);
         return;
       }
       
