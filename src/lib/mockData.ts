@@ -168,20 +168,30 @@ export const routeHistory = routePoints;
 // Route from Burnaby, BC to Calgary, AB for tracking TH-2026-R9PZ36QK
 export const burnabayToCalgaryRoute: Coordinates[] = [
   { lat: 49.2827, lng: -122.9955 }, // Burnaby, BC start
+  { lat: 49.35, lng: -122.8 },
   { lat: 49.5, lng: -121.5 },       // Intermediate point
+  { lat: 49.65, lng: -120.8 },
   { lat: 49.8, lng: -120.0 },       // Intermediate point
+  { lat: 50.0, lng: -119.2 },
   { lat: 50.2, lng: -118.5 },       // Intermediate point
+  { lat: 50.35, lng: -117.8 },
   { lat: 50.5, lng: -117.0 },       // Current location (midpoint)
+  { lat: 50.65, lng: -116.2 },
   { lat: 50.8, lng: -115.5 },       // Intermediate point
+  { lat: 50.93, lng: -114.95 },
   { lat: 51.0537, lng: -114.0823 }, // Calgary, AB destination
 ];
 
 // Route from Chesapeake, VA to Huddleston, VA for tracking TH-2026-3C3MLEDD
 export const chesapeakeToHuddlestonRoute: Coordinates[] = [
   { lat: 36.8629, lng: -76.2775 }, // Chesapeake, VA start
+  { lat: 36.95, lng: -76.7 },
   { lat: 37.0, lng: -77.0 },       // Intermediate point
+  { lat: 37.1, lng: -77.3 },
   { lat: 37.2, lng: -77.5 },       // Current location (midpoint)
+  { lat: 37.3, lng: -77.9 },
   { lat: 37.4, lng: -78.2 },       // Intermediate point
+  { lat: 37.46, lng: -78.6 },
   { lat: 37.5204, lng: -78.9667 }, // Huddleston, VA destination
 ];
 
