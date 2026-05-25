@@ -97,41 +97,22 @@ const useAnimatedPosition = (target: Coordinates, durationMs: number) => {
 };
 
 const createTruckIcon = (heading: number = 0) => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="56" height="56">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
     <defs>
-      <filter id="van-shadow" x="-30%" y="-30%" width="160%" height="160%">
-        <feDropShadow dx="0" dy="3" stdDeviation="4" flood-opacity="0.35"/>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
       </filter>
     </defs>
-    <g transform="rotate(${heading}, 32, 32)" filter="url(#van-shadow)">
-      <!-- Van body -->
-      <rect x="12" y="20" width="40" height="20" rx="3" fill="#0A2F6B" stroke="white" stroke-width="2"/>
-      <!-- Cargo area (darker) -->
-      <rect x="24" y="22" width="24" height="16" rx="2" fill="#051a3d"/>
-      <!-- Windows -->
-      <rect x="26" y="24" width="8" height="8" rx="1" fill="#87CEEB"/>
-      <rect x="38" y="24" width="8" height="8" rx="1" fill="#87CEEB"/>
-      <!-- Cab area -->
-      <rect x="14" y="22" width="10" height="14" rx="1" fill="#051a3d"/>
-      <!-- Cab window -->
-      <circle cx="19" cy="27" r="3" fill="#87CEEB"/>
-      <!-- Wheel 1 (back) -->
-      <circle cx="20" cy="42" r="4" fill="#333" stroke="white" stroke-width="1"/>
-      <circle cx="20" cy="42" r="2.5" fill="#555"/>
-      <!-- Wheel 2 (front) -->
-      <circle cx="44" cy="42" r="4" fill="#333" stroke="white" stroke-width="1"/>
-      <circle cx="44" cy="42" r="2.5" fill="#555"/>
-      <!-- Bumper/front -->
-      <rect x="12" y="38" width="4" height="4" fill="#FF6B35"/>
-      <!-- Top accent stripe -->
-      <line x1="14" y1="20" x2="50" y2="20" stroke="#FFCC00" stroke-width="2" stroke-linecap="round"/>
+    <g transform="rotate(${heading}, 24, 24)" filter="url(#shadow)">
+      <circle cx="24" cy="24" r="20" fill="#0A2F6B" stroke="white" stroke-width="2.5"/>
+      <path d="M16 32V16l16 8-16 8z" fill="#FFCC00"/>
     </g>
   </svg>`;
   return L.divIcon({
     html: svg,
     className: "",
-    iconSize: [56, 56],
-    iconAnchor: [28, 28],
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
   });
 };
 

@@ -221,11 +221,6 @@ const TrackPage = () => {
   const [etaTime, setEtaTime] = useState<Date | null>(null);
   const [etaCountdown, setEtaCountdown] = useState<{ hours: number; minutes: number } | null>(null);
 
-  // Animated position for in-transit simulation
-  const [routeProgressIndex, setRouteProgressIndex] = useState(0);
-  const animationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const routeLengthRef = useRef(0);
-
   const mockShipment = id ? getShipmentByTrackingId(id) : null;
 
   useEffect(() => {
@@ -233,38 +228,7 @@ const TrackPage = () => {
     setMapFitNonce(0);
     setLocationRouteHistory([]);
     routeHistorySeededRef.current = false;
-    setRouteProgressIndex(0);
   }, [id]);
-
-  // Animate vehicle movement along route when in transit
-  useEffect(() => {
-    const status = mockShipment?.status || dbShipment?.status;
-    const isMoving = status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY";
-    routeLengthRef.current = mapRouteHistory.length;
-    
-    if (!isMoving || mapRouteHistory.length < 2) {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current);
-        animationIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Update progress every 2 seconds, cycle through route
-    animationIntervalRef.current = setInterval(() => {
-      setRouteProgressIndex((prev) => {
-        const nextIndex = (prev + 1) % routeLengthRef.current;
-        return nextIndex;
-      });
-    }, 2000);
-
-    return () => {
-      if (animationIntervalRef.current) {
-        clearInterval(animationIntervalRef.current);
-        animationIntervalRef.current = null;
-      }
-    };
-  }, [mapRouteHistory, mockShipment?.status, dbShipment?.status]);
 
   // Load shipment + subscribe to realtime
   useEffect(() => {
@@ -484,19 +448,11 @@ const TrackPage = () => {
   const isDB = !!dbShipment;
   const shipment: Shipment | null = useMemo(() => {
     if (isDB && dbShipment) {
-      const status = dbShipment.status as ShipmentStatus;
-      const isMoving = (status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY") && locationRouteHistory.length > 0;
-      const animatedLocation = isMoving && routeProgressIndex < locationRouteHistory.length 
-        ? locationRouteHistory[routeProgressIndex]
-        : (dbShipment.current_lat != null && dbShipment.current_lng != null
-            ? { lat: num(dbShipment.current_lat), lng: num(dbShipment.current_lng) }
-            : undefined);
-      
       return {
         id: dbShipment.id,
         trackingId: dbShipment.tracking_id,
         serviceType: dbShipment.service_type as Shipment["serviceType"],
-        status: status,
+        status: dbShipment.status as ShipmentStatus,
         sender: {
           name: dbShipment.sender_name,
           street: dbShipment.sender_street || "",
@@ -522,7 +478,10 @@ const TrackPage = () => {
         requiresSignature: dbShipment.requires_signature || false,
         estimatedDeliveryDate: dbShipment.estimated_delivery_date || "",
         actualDeliveryDate: dbShipment.actual_delivery_date || undefined,
-        currentLocation: animatedLocation as unknown as Coordinates,
+        currentLocation:
+          dbShipment.current_lat != null && dbShipment.current_lng != null
+            ? { lat: num(dbShipment.current_lat), lng: num(dbShipment.current_lng) }
+            : undefined as unknown as Coordinates,
         events: dbEvents.map((e) => ({
           status: e.status as ShipmentStatus,
           description: e.description || "",
@@ -532,23 +491,8 @@ const TrackPage = () => {
         createdAt: dbShipment.created_at,
       };
     }
-    
-    // For mock shipments, use animated location if moving
-    if (mockShipment) {
-      const status = mockShipment.status;
-      const isMoving = (status === "IN_TRANSIT" || status === "OUT_FOR_DELIVERY") && mapRouteHistory.length > 0;
-      const animatedLocation = isMoving && routeProgressIndex < mapRouteHistory.length 
-        ? mapRouteHistory[routeProgressIndex]
-        : mockShipment.currentLocation;
-      
-      return {
-        ...mockShipment,
-        currentLocation: animatedLocation,
-      };
-    }
-    
-    return null;
-  }, [isDB, dbShipment, dbEvents, mockShipment, routeProgressIndex, locationRouteHistory, mapRouteHistory]);
+    return mockShipment || null;
+  }, [isDB, dbShipment, dbEvents, mockShipment]);
 
   useEffect(() => {
     if (!isDB || locationRouteHistory.length === 0) return;
@@ -560,16 +504,7 @@ const TrackPage = () => {
 
   const mapRouteHistory = useMemo(() => {
     if (isDB) return locationRouteHistory;
-    if (mockShipment) {
-      // Use special routes for specific mock shipments
-      if (mockShipment.trackingId === "TH-2026-R9PZ36QK") {
-        return burnabayToCalgaryRoute;
-      }
-      if (mockShipment.trackingId === "TH-2026-3C3MLEDD") {
-        return chesapeakeToHuddlestonRoute;
-      }
-      return mockRouteHistory;
-    }
+    if (mockShipment) return mockRouteHistory;
     return [];
   }, [isDB, locationRouteHistory, mockShipment]);
 
@@ -959,7 +894,7 @@ const TrackPage = () => {
                           currentLocation={currentLoc}
                           destination={destination}
                           origin={origin}
-                          showRoute={true}
+                          showRoute={false}
                           showOriginMarker={false}
                           followTruck={followTruck}
                           onFollowTruckChange={setFollowTruck}
