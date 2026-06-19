@@ -2,7 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Search, Package, Truck, ArrowRight, MapPin, Clock, Shield,
   CheckCircle, Globe, Zap, Star, ChevronRight, ChevronLeft, Phone, Mail,
-  BarChart3, Users, Box, Plane, Ship, Anchor
+  BarChart3, Users, Box, Plane, Ship, Anchor, Cpu, ShoppingBag, Wrench,
+  Home, Boxes, PawPrint
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
