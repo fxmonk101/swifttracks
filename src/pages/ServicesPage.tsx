@@ -1,7 +1,7 @@
 import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import { useScrollAnimation } from "@/hooks/useScrollAnimation";
-import { Zap, Truck, Globe, Shield, Clock, Package, CheckCircle, ArrowRight } from "lucide-react";
+import { Zap, Truck, Globe, Shield, Clock, Package, CheckCircle, ArrowRight, Cpu, ShoppingBag, Wrench, Home, Boxes, PawPrint } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
