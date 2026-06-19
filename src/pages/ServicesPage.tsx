@@ -73,6 +73,98 @@ const ServicesPage = () => (
         </Section>
       </div>
     </section>
+
+    {/* Types of Goods We Transport Section */}
+    <section className="bg-background py-16 md:py-20 border-t border-border">
+      <div className="container">
+        <Section>
+          <div className="text-center mb-12">
+            <p className="font-mono text-xs text-primary tracking-widest uppercase mb-2">Our Cargo Portfolio</p>
+            <h2 className="font-display text-4xl md:text-5xl font-black text-foreground">TYPES OF GOODS WE TRANSPORT</h2>
+            <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
+              TransportHaven is equipped to handle diverse cargo types with specialized care, strict compliance, and optimal transit conditions.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                icon: Cpu,
+                title: "Electronics",
+                desc: "Laptops, phones, tablets, and other electronic devices.",
+              },
+              {
+                icon: ShoppingBag,
+                title: "Retail & E-commerce Products",
+                desc: "Clothing, footwear, books, and consumer goods.",
+              },
+              {
+                icon: Wrench,
+                title: "Industrial Equipment & Machinery Parts",
+                desc: "Tools, spare parts, and manufacturing equipment.",
+              },
+              {
+                icon: Home,
+                title: "Household Goods",
+                desc: "Furniture, appliances, and personal belongings.",
+              },
+              {
+                icon: Boxes,
+                title: "Commercial Bulk Cargo",
+                desc: "Raw materials, wholesale inventory, and packaged goods.",
+              },
+              {
+                icon: PawPrint,
+                title: "Livestock & Specialized Cargo",
+                desc: "Cattle, sheep, goats, pets, horses, poultry, and other live animals, provided all applicable animal transport, health, and regulatory requirements are met. TransportHaven offers air, sea, and land freight services that can support specialized cargo movement.",
+                highlight: true,
+              },
+            ].map((goods, idx) => (
+              <Card 
+                key={idx} 
+                className={`group transition-all duration-300 hover:shadow-xl hover:-translate-y-1 overflow-hidden ${
+                  goods.highlight 
+                    ? "border-primary/50 bg-primary/5 md:col-span-2 lg:col-span-3 flex flex-col md:flex-row gap-6 p-6" 
+                    : "bg-card border-border"
+                }`}
+              >
+                {goods.highlight ? (
+                  <>
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                      <goods.icon className="h-8 w-8 text-primary animate-pulse" />
+                    </div>
+                    <div className="flex-1">
+                      <span className="bg-primary text-primary-foreground text-xs font-bold font-mono px-2.5 py-1 rounded-full inline-block mb-3">
+                        SPECIALIZED FREIGHT
+                      </span>
+                      <h3 className="font-display text-2xl font-black text-foreground mb-2">
+                        {goods.title}
+                      </h3>
+                      <p className="text-base text-muted-foreground leading-relaxed">
+                        {goods.desc}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <CardContent className="p-6">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                      <goods.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="font-display text-lg font-bold mb-2 text-foreground">
+                      {goods.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {goods.desc}
+                    </p>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        </Section>
+      </div>
+    </section>
+
     <Footer />
   </div>
 );
