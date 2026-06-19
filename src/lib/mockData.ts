@@ -176,15 +176,6 @@ export const burnabayToCalgaryRoute: Coordinates[] = [
   { lat: 51.0537, lng: -114.0823 }, // Calgary, AB destination
 ];
 
-// Route from Chesapeake, VA to Huddleston, VA for tracking TH-2026-3C3MLEDD
-export const chesapeakeToHuddlestonRoute: Coordinates[] = [
-  { lat: 36.8629, lng: -76.2775 }, // Chesapeake, VA start
-  { lat: 37.0, lng: -77.0 },       // Intermediate point
-  { lat: 37.2, lng: -77.5 },       // Current location (midpoint)
-  { lat: 37.4, lng: -78.2 },       // Intermediate point
-  { lat: 37.5204, lng: -78.9667 }, // Huddleston, VA destination
-];
-
 export function getShipmentByTrackingId(trackingId: string): Shipment | undefined {
   return mockShipments.find((s) => s.trackingId.toLowerCase() === trackingId.toLowerCase());
 }
