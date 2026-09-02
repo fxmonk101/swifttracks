@@ -14,6 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
+      invoice_email_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          invoice_id: string
+          recipient_email: string
+          recipient_type: string
+          sent_at: string | null
+          status: string
+          tracking_number: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id: string
+          recipient_email: string
+          recipient_type: string
+          sent_at?: string | null
+          status?: string
+          tracking_number: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id?: string
+          recipient_email?: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+          tracking_number?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_email_logs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          amount_paid: number
+          balance_due: number
+          created_at: string
+          currency: string
+          discount: number
+          error_message: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          line_items: Json
+          payment_status: string
+          pdf_path: string | null
+          shipment_id: string
+          status: string
+          subtotal: number
+          tax: number
+          total: number
+          tracking_number: string
+          updated_at: string
+        }
+        Insert: {
+          amount_paid?: number
+          balance_due?: number
+          created_at?: string
+          currency?: string
+          discount?: number
+          error_message?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number: string
+          line_items?: Json
+          payment_status?: string
+          pdf_path?: string | null
+          shipment_id: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_number: string
+          updated_at?: string
+        }
+        Update: {
+          amount_paid?: number
+          balance_due?: number
+          created_at?: string
+          currency?: string
+          discount?: number
+          error_message?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          line_items?: Json
+          payment_status?: string
+          pdf_path?: string | null
+          shipment_id?: string
+          status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_number?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_shipment_id_fkey"
+            columns: ["shipment_id"]
+            isOneToOne: true
+            referencedRelation: "shipments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
