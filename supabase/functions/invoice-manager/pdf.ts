@@ -1,4 +1,4 @@
-// Server-side A4 shipment invoice PDF renderer (pdf-lib, no browser required)
+// DHL-style "Shipment Receipt" PDF renderer (pdf-lib, no browser required)
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "npm:pdf-lib@1.17.1";
 import qrcode from "npm:qrcode-generator@1.4.4";
 import { LOGO_PNG_BASE64, LOGO_H, LOGO_W } from "./logo.ts";
@@ -13,18 +13,16 @@ export const COMPANY = {
   website: "https://transporthaven.com",
 };
 
-const NAVY = rgb(0.043, 0.165, 0.333);
-const NAVY_SOFT = rgb(0.11, 0.25, 0.44);
+const INK = rgb(0.07, 0.08, 0.1);
+const MUTED = rgb(0.38, 0.41, 0.46);
+const RULE = rgb(0.1, 0.11, 0.13);
+const LIGHT = rgb(0.82, 0.84, 0.87);
 const RED = rgb(0.82, 0.02, 0.1);
-const INK = rgb(0.11, 0.13, 0.18);
-const MUTED = rgb(0.42, 0.46, 0.53);
-const LINE = rgb(0.84, 0.86, 0.89);
-const BAND = rgb(0.957, 0.965, 0.976);
-const WHITE = rgb(1, 1, 1);
 
 const A4: [number, number] = [595.28, 841.89];
-const M = 40; // margin
-const CW = A4[0] - M * 2; // content width
+const M = 46;
+const CW = A4[0] - M * 2;
+const COL2 = M + CW / 2 + 8;
 
 export type LineItem = { description: string; quantity: number; unit_price: number; amount: number };
 
@@ -63,21 +61,26 @@ export const money = (currency: string, value: number): string => {
   const amount = (Math.round(N(value) * 100) / 100).toFixed(2);
   const [int, dec] = amount.split(".");
   const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const symbol = currency === "USD" ? "$" : currency === "EUR" ? "\u20AC" : currency === "GBP" ? "\u00A3" : "";
-  return symbol ? `${symbol}${grouped}.${dec}` : `${currency} ${grouped}.${dec}`;
+  return `${grouped}.${dec} ${currency}`;
 };
 
-const fmtDate = (value?: string | null): string => {
+const fmtDateISO = (value?: string | null): string => {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" });
+  return d.toISOString().slice(0, 10);
+};
+const fmtDateLong = (value?: string | null): string => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "short", day: "2-digit", timeZone: "UTC" });
 };
 const fmtDateTime = (value?: string | null): string => {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  return `${fmtDate(value)} ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
+  return `${fmtDateISO(value)} ${d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC`;
 };
 const statusLabel = (raw: string): string =>
   S(raw)
@@ -113,16 +116,20 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
   return lines;
 }
 
-const addressLines = (p: Record<string, unknown>, prefix: "sender" | "receiver"): string[] => {
+const partyBlock = (p: Record<string, unknown>, prefix: "sender" | "receiver"): string[] => {
   const out: string[] = [];
+  const name = S(p[`${prefix}_name`]);
+  if (name) out.push(name);
+  const company = S(p[`${prefix}_company`]);
+  if (company) out.push(company);
   const street = S(p[`${prefix}_street`]);
   if (street) out.push(street);
-  const city = [S(p[`${prefix}_city`]), S(p[`${prefix}_state`])].filter(Boolean).join(", ");
-  const zip = S(p[`${prefix}_zip`]);
-  const cityLine = [city, zip].filter(Boolean).join(" ");
+  const cityLine = [S(p[`${prefix}_city`]), S(p[`${prefix}_state`]), S(p[`${prefix}_zip`])].filter(Boolean).join(" ");
   if (cityLine) out.push(cityLine);
   const country = S(p[`${prefix}_country`]);
-  if (country) out.push(country.toUpperCase() === "US" ? "United States" : country);
+  if (country) out.push(country.toUpperCase() === "US" ? "United States" : country.toUpperCase() === "CA" ? "Canada" : country);
+  const phone = S(p[`${prefix}_phone`]);
+  if (phone) out.push(phone);
   return out;
 };
 
@@ -134,17 +141,16 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
   const cur = invoice.currency || "USD";
 
   const doc = await PDFDocument.create();
-  doc.setTitle(`TransportHaven Invoice ${invoice.invoice_number}`);
+  doc.setTitle(`TransportHaven Shipment Receipt ${invoice.invoice_number}`);
   doc.setAuthor(COMPANY.name);
-  doc.setSubject(`Shipment invoice for ${invoice.tracking_number}`);
+  doc.setSubject(`Shipment receipt for ${invoice.tracking_number}`);
 
   const reg = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = await doc.embedPng(Uint8Array.from(atob(LOGO_PNG_BASE64), (c) => c.charCodeAt(0)));
 
   let page: PDFPage = doc.addPage(A4);
-  let y = 0;
-  let pageIndex = 0;
+  let y = A4[1] - M;
 
   const text = (
     str: string,
@@ -152,292 +158,243 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
     baselineY: number,
     opts: { size?: number; font?: PDFFont; color?: typeof INK } = {},
   ) => {
-    page.drawText(S(str), {
-      x,
-      y: baselineY,
-      size: opts.size ?? 9,
-      font: opts.font ?? reg,
-      color: opts.color ?? INK,
-    });
+    page.drawText(S(str), { x, y: baselineY, size: opts.size ?? 9, font: opts.font ?? reg, color: opts.color ?? INK });
   };
 
-  const drawFooter = (p: PDFPage) => {
-    p.drawLine({ start: { x: M, y: 74 }, end: { x: A4[0] - M, y: 74 }, thickness: 0.7, color: LINE });
-    const notes = [
-      `${COMPANY.website}  |  ${COMPANY.email}  |  ${COMPANY.phone} (calls & text)`,
-      `Track your shipment any time at ${COMPANY.website}/track using tracking number ${invoice.tracking_number}.`,
-      "Payment terms: due within 14 days of the invoice date. Late balances may delay release of the shipment.",
-      "Shipment charges and delivery estimates may be subject to applicable customs, duties, taxes and service conditions.",
-    ];
-    let fy = 64;
-    for (const note of notes) {
-      for (const ln of wrap(note, reg, 6.8, CW)) {
-        p.drawText(ln, { x: M, y: fy, size: 6.8, font: reg, color: MUTED });
-        fy -= 8.4;
-      }
-    }
-    p.drawText("Thank you for choosing TransportHaven.", { x: M, y: fy - 2, size: 8, font: bold, color: NAVY });
+  const rule = (atY: number, thickness = 1.4) => {
+    page.drawLine({ start: { x: M, y: atY }, end: { x: A4[0] - M, y: atY }, thickness, color: RULE });
   };
 
-  const drawPageHeader = (first: boolean) => {
-    page.drawRectangle({ x: 0, y: A4[1] - 6, width: A4[0], height: 6, color: RED });
-    const logoW = first ? 148 : 112;
-    const logoH = (logoW * LOGO_H) / LOGO_W;
-    page.drawImage(logo, { x: M, y: A4[1] - 24 - logoH, width: logoW, height: logoH });
-
-    if (first) {
-      let hy = A4[1] - 30;
-      const right = (str: string, size: number, font: PDFFont, color = MUTED) => {
-        const w = font.widthOfTextAtSize(str, size);
-        page.drawText(str, { x: A4[0] - M - w, y: hy, size, font, color });
-        hy -= size + 3.2;
-      };
-      right(COMPANY.name, 11, bold, NAVY);
-      right(COMPANY.address, 8, reg);
-      right(COMPANY.cityLine, 8, reg);
-      right(`Tel: ${COMPANY.phone}`, 8, reg);
-      right(COMPANY.email, 8, reg);
-      right("transporthaven.com", 8, reg);
-      y = Math.min(A4[1] - 24 - logoH, hy) - 18;
-    } else {
-      const label = `Invoice ${invoice.invoice_number} \u2022 Tracking ${invoice.tracking_number}`;
-      const w = reg.widthOfTextAtSize(label, 8);
-      page.drawText(label, { x: A4[0] - M - w, y: A4[1] - 34, size: 8, font: reg, color: MUTED });
-      y = A4[1] - 24 - logoH - 16;
-    }
+  const heading = (label: string, x: number, atY: number) => {
+    page.drawText(label, { x, y: atY, size: 13.5, font: bold, color: INK });
   };
 
   const newPage = () => {
-    drawFooter(page);
     page = doc.addPage(A4);
-    pageIndex += 1;
-    drawPageHeader(false);
+    y = A4[1] - M;
   };
-
   const ensure = (needed: number) => {
-    if (y - needed < 96) newPage();
+    if (y - needed < 70) newPage();
   };
 
-  drawPageHeader(true);
+  // ---- Header: logo left, title right -------------------------------------
+  const logoW = 132;
+  const logoH = (logoW * LOGO_H) / LOGO_W;
+  page.drawImage(logo, { x: M, y: y - logoH, width: logoW, height: logoH });
+  const title = "Shipment Receipt";
+  const titleW = bold.widthOfTextAtSize(title, 22);
+  text(title, A4[0] - M - titleW, y - logoH + 4, { size: 22, font: bold });
+  y -= logoH + 12;
+  rule(y);
+  y -= 26;
 
-  // ---- Title + meta -------------------------------------------------------
-  const metaRows: [string, string][] = [
-    ["Invoice Number", invoice.invoice_number],
-    ["Invoice Date", fmtDate(invoice.invoice_date)],
-    ["Tracking Number", invoice.tracking_number],
-    ["Shipment Status", statusLabel(S(shipment.status))],
-    ["Payment Status", statusLabel(invoice.payment_status)],
-    ["Currency", cur],
-  ];
-  const titleH = 26;
-  page.drawRectangle({ x: M, y: y - titleH, width: CW, height: titleH, color: NAVY });
-  page.drawRectangle({ x: M, y: y - titleH, width: 5, height: titleH, color: RED });
-  text("SHIPMENT INVOICE", M + 14, y - titleH + 8.5, { size: 14, font: bold, color: WHITE });
-  const totalTag = `TOTAL ${money(cur, invoice.total)}`;
-  const tagW = bold.widthOfTextAtSize(totalTag, 11);
-  text(totalTag, A4[0] - M - 12 - tagW, y - titleH + 9, { size: 11, font: bold, color: WHITE });
-  y -= titleH + 12;
+  // ---- Shipment From / Shipment To ---------------------------------------
+  heading("Shipment From", M, y);
+  heading("Shipment To", COL2, y);
+  y -= 20;
 
-  const metaBoxH = 20 + Math.ceil(metaRows.length / 3) * 26;
-  page.drawRectangle({ x: M, y: y - metaBoxH, width: CW, height: metaBoxH, color: BAND, borderColor: LINE, borderWidth: 0.7 });
-  const colW = CW / 3;
-  metaRows.forEach((row, i) => {
-    const col = i % 3;
-    const line = Math.floor(i / 3);
-    const cx = M + 14 + col * colW;
-    const cy = y - 20 - line * 26;
-    text(row[0].toUpperCase(), cx, cy, { size: 6.6, font: bold, color: MUTED });
-    text(row[1] || "\u2014", cx, cy - 11, { size: 9.5, font: bold, color: NAVY });
-  });
-  y -= metaBoxH + 16;
+  const fromLines = partyBlock(shipment, "sender");
+  const toLines = partyBlock(shipment, "receiver");
+  const fromEmail = S(shipment.sender_email);
+  const toEmail = S(shipment.receiver_email);
+  const colW = CW / 2 - 18;
 
-  // ---- Shipper / Consignee ------------------------------------------------
-  const partyBoxW = (CW - 14) / 2;
-  const partyLines = (prefix: "sender" | "receiver") => {
-    const lines: { txt: string; bold?: boolean; muted?: boolean }[] = [];
-    lines.push({ txt: S(shipment[`${prefix}_name`]) || "\u2014", bold: true });
-    for (const l of addressLines(shipment, prefix)) lines.push({ txt: l });
-    const phone = S(shipment[`${prefix}_phone`]);
-    const email = S(shipment[`${prefix}_email`]);
-    if (phone) lines.push({ txt: `Tel: ${phone}`, muted: true });
-    if (email) lines.push({ txt: email, muted: true });
-    return lines;
-  };
-  const senderLines = partyLines("sender");
-  const receiverLines = partyLines("receiver");
-  const bodyH = Math.max(senderLines.length, receiverLines.length) * 12 + 34;
-  ensure(bodyH + 10);
-
-  const drawParty = (title: string, x: number, lines: { txt: string; bold?: boolean; muted?: boolean }[]) => {
-    page.drawRectangle({ x, y: y - bodyH, width: partyBoxW, height: bodyH, borderColor: LINE, borderWidth: 0.7, color: WHITE });
-    page.drawRectangle({ x, y: y - 17, width: partyBoxW, height: 17, color: NAVY });
-    text(title, x + 10, y - 12, { size: 7.6, font: bold, color: WHITE });
-    let ly = y - 32;
-    for (const l of lines) {
-      for (const w of wrap(l.txt, l.bold ? bold : reg, l.bold ? 9.5 : 8.6, partyBoxW - 20)) {
-        text(w, x + 10, ly, {
-          size: l.bold ? 9.5 : 8.6,
-          font: l.bold ? bold : reg,
-          color: l.muted ? MUTED : INK,
-        });
-        ly -= 12;
+  const drawParty = (lines: string[], email: string, x: number): number => {
+    let ly = y;
+    for (const line of lines) {
+      for (const w of wrap(line, reg, 9, colW)) {
+        text(w, x, ly, { size: 9 });
+        ly -= 12.5;
       }
     }
+    if (email) {
+      ly -= 6;
+      text(email, x, ly, { size: 9, color: MUTED });
+      ly -= 12.5;
+    }
+    return ly;
   };
-  drawParty("SHIPPER / SENDER", M, senderLines);
-  drawParty("CONSIGNEE / RECEIVER", M + partyBoxW + 14, receiverLines);
-  y -= bodyH + 16;
+  const endFrom = drawParty(fromLines, fromEmail, M);
+  const endTo = drawParty(toLines, toEmail, COL2);
+  y = Math.min(endFrom, endTo) - 22;
+  rule(y);
+  y -= 26;
 
-  // ---- Shipment details ---------------------------------------------------
+  // ---- Shipment Details / International Information ----------------------
+  heading("Shipment Details", M, y);
+  heading("International Information", COL2, y);
+  y -= 20;
+
   const dims = [N(shipment.dimensions_length), N(shipment.dimensions_width), N(shipment.dimensions_height)];
   const pkgCount = Math.max(1, Math.round(N(shipment.package_count) || 1));
-  const detailPairs: [string, string][] = [
-    ["Tracking Number", invoice.tracking_number],
-    ["Shipment Date", fmtDate(S(shipment.pickup_date) || S(shipment.created_at))],
-    ["Estimated Delivery", fmtDate(S(shipment.estimated_delivery_date))],
-    ["Origin", locationText(shipment, "sender")],
-    ["Destination", locationText(shipment, "receiver")],
-    ["Service Type", statusLabel(S(shipment.service_type))],
-    ["Package Type", pkgCount > 1 ? "Multi-piece parcel" : "Parcel"],
-    ["Number of Packages", String(pkgCount)],
-    ["Weight", N(shipment.weight) > 0 ? `${N(shipment.weight).toFixed(2)} lb` : ""],
-    ["Dimensions", dims.every((d) => d > 0) ? `${dims[0]} x ${dims[1]} x ${dims[2]} in` : ""],
-    ["Signature Required", shipment.requires_signature ? "Yes" : "No"],
-    ["Assigned Driver", S(shipment.assigned_driver)],
-    ["Actual Delivery", fmtDate(S(shipment.actual_delivery_date))],
-  ].filter((pair) => S(pair[1]) !== "") as [string, string][];
+  const weightKg = N(shipment.weight) * 0.453592;
 
-  const detailRows = Math.ceil(detailPairs.length / 2);
-  ensure(detailRows * 18 + 40);
-  page.drawRectangle({ x: M, y: y - 17, width: CW, height: 17, color: NAVY_SOFT });
-  text("SHIPMENT DETAILS", M + 10, y - 12, { size: 7.6, font: bold, color: WHITE });
-  y -= 17;
-  const halfW = CW / 2;
-  for (let r = 0; r < detailRows; r++) {
-    const rowY = y - r * 18;
-    if (r % 2 === 0) page.drawRectangle({ x: M, y: rowY - 18, width: CW, height: 18, color: BAND });
-    for (let c = 0; c < 2; c++) {
-      const pair = detailPairs[r * 2 + c];
-      if (!pair) continue;
-      const x = M + c * halfW;
-      text(pair[0].toUpperCase(), x + 10, rowY - 12, { size: 6.6, font: bold, color: MUTED });
-      const valX = x + 118;
-      const lines = wrap(pair[1], reg, 8.6, halfW - 128);
-      text(lines[0] ?? "", valX, rowY - 12, { size: 8.6 });
-      if (lines.length > 1) text(lines.slice(1).join(" "), valX, rowY - 12, { size: 8.6 });
+  const leftRows: [string, string][] = [
+    ["Shipment Date:", fmtDateISO(S(shipment.pickup_date) || S(shipment.created_at))],
+    ["Waybill Number:", invoice.tracking_number],
+    ["Receipt Number:", invoice.invoice_number],
+    ["Service Type:", statusLabel(S(shipment.service_type)).toUpperCase()],
+    ["Packaging Type:", pkgCount > 1 ? `${pkgCount} Pieces` : "1 Parcel"],
+    ["Number of Pieces:", String(pkgCount)],
+    ["Total Weight:", N(shipment.weight) > 0 ? `${weightKg.toFixed(2)}kg` : ""],
+    ["Dimensional:", dims.every((d) => d > 0) ? `${dims[0]} x ${dims[1]} x ${dims[2]} in` : ""],
+    ["Chargeable:", N(shipment.weight) > 0 ? `${Math.max(weightKg, 0.5).toFixed(2)}kg` : ""],
+    ["Signature Required:", shipment.requires_signature ? "Yes" : "No"],
+    ["Terms of Trade:", "DAP"],
+  ].filter((r) => S(r[1]) !== "") as [string, string][];
+
+  const rightRows: [string, string][] = [
+    ["Declared Value:", money(cur, invoice.total)],
+    ["Duties & taxes acct:", "Shipper"],
+    ["Dutiable Status:", "Dutiable"],
+    ["Estimated Del date:", fmtDateLong(S(shipment.estimated_delivery_date)) || "Pending schedule"],
+    ["Shipment Status:", statusLabel(S(shipment.status))],
+    ["Current Location:", S(input.currentLocation) || locationText(shipment, "receiver")],
+    ["Assigned Driver:", S(shipment.assigned_driver)],
+    ["Promo Code:", ""],
+  ];
+
+  const drawRows = (rows: [string, string][], x: number, labelW: number, maxW: number): number => {
+    let ly = y;
+    for (const [label, value] of rows) {
+      text(label, x, ly, { size: 8.6, color: INK });
+      const lines = wrap(value, reg, 8.6, maxW - labelW);
+      if (!lines.length) {
+        ly -= 13.5;
+        continue;
+      }
+      lines.forEach((ln, i) => {
+        text(ln, x + labelW, ly - i * 11, { size: 8.6, font: bold });
+      });
+      ly -= 13.5 + (lines.length - 1) * 11;
     }
-    page.drawLine({ start: { x: M, y: rowY - 18 }, end: { x: A4[0] - M, y: rowY - 18 }, thickness: 0.5, color: LINE });
-  }
-  y -= detailRows * 18;
-
-  const desc = S(shipment.shipment_description) || S(shipment.description);
-  const instructions = S(shipment.delivery_instructions);
-  for (const block of [
-    desc ? { label: "SHIPMENT DESCRIPTION", value: desc } : null,
-    instructions ? { label: "DELIVERY INSTRUCTIONS", value: instructions } : null,
-  ]) {
-    if (!block) continue;
-    const lines = wrap(block.value, reg, 8.6, CW - 20);
-    ensure(lines.length * 11 + 24);
-    text(block.label, M + 10, y - 13, { size: 6.6, font: bold, color: MUTED });
-    let by = y - 25;
-    for (const ln of lines) {
-      text(ln, M + 10, by, { size: 8.6 });
-      by -= 11;
-    }
-    y = by - 6;
-  }
-  y -= 12;
-
-  // ---- Charges ------------------------------------------------------------
-  const items = invoice.line_items ?? [];
-  ensure(items.length * 17 + 130);
-  const cols = [M, M + CW - 250, M + CW - 190, M + CW - 90];
-  page.drawRectangle({ x: M, y: y - 18, width: CW, height: 18, color: NAVY });
-  text("DESCRIPTION", cols[0] + 10, y - 12.5, { size: 7.2, font: bold, color: WHITE });
-  const headRight = (label: string, xRight: number) => {
-    const w = bold.widthOfTextAtSize(label, 7.2);
-    text(label, xRight - w, y - 12.5, { size: 7.2, font: bold, color: WHITE });
+    return ly;
   };
-  headRight("QTY", cols[2] - 12);
-  headRight("UNIT PRICE", cols[3] - 12);
-  headRight("AMOUNT", M + CW - 10);
-  y -= 18;
+  const endLeft = drawRows(leftRows, M, 104, colW + 14);
+  const endRight = drawRows(rightRows, COL2, 108, colW + 14);
+  y = Math.min(endLeft, endRight) - 14;
 
-  items.forEach((item, i) => {
-    if (y - 17 < 96) {
-      newPage();
-      page.drawRectangle({ x: M, y: y - 18, width: CW, height: 18, color: NAVY });
-      text("DESCRIPTION (CONTINUED)", cols[0] + 10, y - 12.5, { size: 7.2, font: bold, color: WHITE });
-      y -= 18;
+  // ---- Billing Information ------------------------------------------------
+  ensure(140);
+  heading("Billing Information", M, y);
+  y -= 20;
+  const billRows: [string, string][] = [
+    ["Payment Type:", "TransportHaven Account"],
+    ["Billing Account:", `TH-${invoice.tracking_number.replace(/[^A-Z0-9]/gi, "").slice(-8).toUpperCase()}`],
+    ["Duties & taxes acct:", "Shipper"],
+    ["Payment Status:", statusLabel(invoice.payment_status)],
+    ["Charge Breakdown:", money(cur, invoice.total)],
+  ];
+  const billEnd = drawRows(billRows, M, 104, colW + 14);
+  // Special services column
+  let sy = y;
+  text("Special Services:", COL2, sy, { size: 8.6 });
+  const svc = [
+    shipment.requires_signature ? "Signature on delivery" : null,
+    "Fuel Surcharge",
+    "Real-time GPS tracking",
+  ].filter(Boolean) as string[];
+  for (const s of svc) {
+    for (const ln of wrap(s, reg, 8.6, colW - 96)) {
+      text(ln, COL2 + 96, sy, { size: 8.6, font: bold });
+      sy -= 11.5;
     }
-    if (i % 2 === 1) page.drawRectangle({ x: M, y: y - 17, width: CW, height: 17, color: BAND });
-    const nameLines = wrap(item.description, reg, 8.6, cols[1] - cols[0] - 20);
-    text(nameLines[0] ?? "", cols[0] + 10, y - 11.5, { size: 8.6 });
-    const rightAt = (str: string, xRight: number) => {
-      const w = reg.widthOfTextAtSize(str, 8.6);
-      text(str, xRight - w, y - 11.5, { size: 8.6 });
-    };
-    rightAt(String(item.quantity ?? 1), cols[2] - 12);
-    rightAt(money(cur, item.unit_price), cols[3] - 12);
-    rightAt(money(cur, item.amount), M + CW - 10);
-    page.drawLine({ start: { x: M, y: y - 17 }, end: { x: A4[0] - M, y: y - 17 }, thickness: 0.5, color: LINE });
-    y -= 17;
-  });
+  }
+  y = Math.min(billEnd, sy) - 10;
 
-  // Totals
+  // ---- Charge table -------------------------------------------------------
+  const items = invoice.line_items ?? [];
+  ensure(items.length * 15 + 130);
+  const amtRight = A4[0] - M;
+  const unitRight = amtRight - 108;
+  const qtyRight = unitRight - 62;
+  page.drawLine({ start: { x: M, y: y }, end: { x: amtRight, y }, thickness: 0.8, color: LIGHT });
+  y -= 14;
+  const rightAt = (str: string, xRight: number, opts: { size?: number; font?: PDFFont; color?: typeof INK } = {}) => {
+    const f = opts.font ?? reg;
+    const size = opts.size ?? 8.6;
+    text(str, xRight - f.widthOfTextAtSize(str, size), y, { ...opts, size, font: f });
+  };
+  text("Charge Description", M, y, { size: 8.4, font: bold, color: MUTED });
+  rightAt("QTY", qtyRight, { size: 8.4, font: bold, color: MUTED });
+  rightAt("UNIT PRICE", unitRight, { size: 8.4, font: bold, color: MUTED });
+  rightAt("AMOUNT", amtRight, { size: 8.4, font: bold, color: MUTED });
+  y -= 6;
+  page.drawLine({ start: { x: M, y }, end: { x: amtRight, y }, thickness: 0.6, color: LIGHT });
+  y -= 15;
+
+  for (const item of items) {
+    if (y < 96) {
+      newPage();
+      y -= 10;
+    }
+    const nameLines = wrap(item.description, reg, 8.8, qtyRight - M - 40);
+    text(nameLines[0] ?? "", M, y, { size: 8.8 });
+    rightAt(String(item.quantity ?? 1), qtyRight, { size: 8.8 });
+    rightAt(money(cur, item.unit_price), unitRight, { size: 8.8 });
+    rightAt(money(cur, item.amount), amtRight, { size: 8.8 });
+    y -= 15;
+    if (nameLines.length > 1) {
+      for (const ln of nameLines.slice(1)) {
+        text(ln, M, y, { size: 8.2, color: MUTED });
+        y -= 12;
+      }
+    }
+  }
+
+  page.drawLine({ start: { x: M, y: y + 3 }, end: { x: amtRight, y: y + 3 }, thickness: 0.6, color: LIGHT });
+  y -= 8;
   const totals: [string, number, boolean?][] = [
     ["Subtotal", invoice.subtotal],
     ["Discount", -Math.abs(invoice.discount)],
     ["Tax / VAT", invoice.tax],
-    ["Total Shipping Charges", invoice.total, true],
+    ["Total Charges", invoice.total, true],
     ["Amount Paid", invoice.amount_paid],
     ["Balance Due", invoice.balance_due, true],
   ];
-  ensure(totals.length * 16 + 20);
-  const tBoxX = M + CW - 250;
-  y -= 8;
-  totals.forEach(([label, value, strong]) => {
-    if (strong) page.drawRectangle({ x: tBoxX, y: y - 16, width: 250, height: 16, color: strong ? BAND : WHITE });
-    text(label, tBoxX + 10, y - 11.5, { size: strong ? 9 : 8.6, font: strong ? bold : reg, color: strong ? NAVY : INK });
-    const str = money(cur, value);
-    const f = strong ? bold : reg;
-    const size = strong ? 9 : 8.6;
-    const w = f.widthOfTextAtSize(str, size);
-    text(str, M + CW - 10 - w, y - 11.5, { size, font: f, color: strong ? NAVY : INK });
-    y -= 16;
-  });
-  y -= 14;
-
-  // ---- Track your shipment + QR ------------------------------------------
-  const qrSize = 88;
-  const trackH = qrSize + 26;
-  ensure(trackH + 10);
-  page.drawRectangle({ x: M, y: y - trackH, width: CW, height: trackH, color: BAND, borderColor: LINE, borderWidth: 0.7 });
-  text("TRACK YOUR SHIPMENT", M + 14, y - 18, { size: 7.6, font: bold, color: NAVY });
-  const trackRows: [string, string][] = [
-    ["Tracking Number", invoice.tracking_number],
-    ["Current Status", statusLabel(S(shipment.status))],
-    ["Current Location", S(input.currentLocation) || locationText(shipment, "receiver")],
-    ["Estimated Delivery", fmtDate(S(shipment.estimated_delivery_date)) || "Pending schedule"],
-  ];
-  let ty = y - 34;
-  for (const [label, value] of trackRows) {
-    text(`${label}:`, M + 14, ty, { size: 8, font: bold, color: MUTED });
-    text(value || "\u2014", M + 110, ty, { size: 8.6 });
-    ty -= 13;
+  for (const [label, value, strong] of totals) {
+    text(label, unitRight - 96, y, { size: strong ? 9.2 : 8.6, font: strong ? bold : reg });
+    rightAt(money(cur, value), amtRight, { size: strong ? 9.2 : 8.6, font: strong ? bold : reg });
+    y -= 14;
   }
-  const urlLines = wrap(trackUrl, reg, 7.4, CW - 150 - qrSize);
-  text(urlLines[0] ?? "", M + 14, ty - 2, { size: 7.4, color: NAVY });
+  y -= 4;
+  text("Charge is estimated until TransportHaven reweigh.", M, y, { size: 8.6 });
+  y -= 24;
 
-  // QR code (pure-JS matrix drawn as vector squares — always renders)
+  // ---- Reference Information ---------------------------------------------
+  ensure(180);
+  heading("Reference Information", M, y);
+  y -= 18;
+  text(`Reference: ${invoice.tracking_number}`, M, y, { size: 8.6, color: MUTED });
+  y -= 12;
+  text(`Pickup reference nr: ${fmtDateISO(S(shipment.pickup_date) || S(shipment.created_at))}`, M, y, { size: 8.6, color: MUTED });
+  y -= 26;
+
+  // ---- Description of Contents -------------------------------------------
+  heading("Description of Contents", M, y);
+  y -= 18;
+  const contents =
+    S(shipment.shipment_description) ||
+    S(shipment.description) ||
+    (Array.isArray(shipment.packages_meta)
+      ? (shipment.packages_meta as { description?: string }[]).map((p) => S(p?.description)).filter(Boolean).join("; ")
+      : "") ||
+    "General merchandise";
+  for (const ln of wrap(contents, reg, 9.4, CW - 130)) {
+    text(ln, M, y, { size: 9.4 });
+    y -= 13;
+  }
+  y -= 10;
+
+  // ---- Tracking + QR ------------------------------------------------------
+  ensure(120);
+  const qrSize = 82;
   const qr = qrcode(0, "M");
   qr.addData(trackUrl);
   qr.make();
   const modules = qr.getModuleCount();
-  const qrX = M + CW - qrSize - 16;
-  const qrY = y - trackH + 20;
-  page.drawRectangle({ x: qrX - 5, y: qrY - 5, width: qrSize + 10, height: qrSize + 10, color: WHITE, borderColor: LINE, borderWidth: 0.6 });
+  const qrX = A4[0] - M - qrSize;
+  const qrY = y - qrSize + 8;
   const cell = qrSize / modules;
   for (let r = 0; r < modules; r++) {
     for (let c = 0; c < modules; c++) {
@@ -451,43 +408,64 @@ export async function buildInvoicePdf(input: InvoicePdfInput): Promise<Uint8Arra
       });
     }
   }
-  const scanLabel = "Scan to track";
-  const slW = reg.widthOfTextAtSize(scanLabel, 6.6);
-  text(scanLabel, qrX + qrSize / 2 - slW / 2, qrY - 14, { size: 6.6, color: MUTED });
-  y -= trackH + 16;
+  const scan = "Scan to track";
+  text(scan, qrX + qrSize / 2 - reg.widthOfTextAtSize(scan, 6.8) / 2, qrY - 11, { size: 6.8, color: MUTED });
 
-  // ---- Shipment history ---------------------------------------------------
-  const history = (events ?? []).slice(0, 8);
+  heading("Tracking", M, y);
+  y -= 18;
+  const trackRows: [string, string][] = [
+    ["Waybill Number:", invoice.tracking_number],
+    ["Current Status:", statusLabel(S(shipment.status))],
+    ["Current Location:", S(input.currentLocation) || locationText(shipment, "receiver")],
+    ["Track online:", trackUrl],
+  ];
+  y = drawRows(trackRows, M, 104, CW - qrSize - 40) - 12;
+
+  // ---- Shipment history --------------------------------------------------
+  const history = (events ?? []).slice(0, 10);
   if (history.length) {
-    ensure(history.length * 16 + 40);
-    page.drawRectangle({ x: M, y: y - 18, width: CW, height: 18, color: NAVY_SOFT });
-    text("SHIPMENT HISTORY", M + 10, y - 12.5, { size: 7.6, font: bold, color: WHITE });
+    ensure(history.length * 13 + 60);
+    heading("Shipment History", M, y);
     y -= 18;
-    const hCols = [M + 10, M + 170, M + 350];
-    page.drawRectangle({ x: M, y: y - 15, width: CW, height: 15, color: BAND });
-    text("DATE & TIME", hCols[0], y - 10.5, { size: 6.6, font: bold, color: MUTED });
-    text("LOCATION", hCols[1], y - 10.5, { size: 6.6, font: bold, color: MUTED });
-    text("STATUS", hCols[2], y - 10.5, { size: 6.6, font: bold, color: MUTED });
-    y -= 15;
+    text("DATE & TIME", M, y, { size: 7.4, font: bold, color: MUTED });
+    text("LOCATION", M + 150, y, { size: 7.4, font: bold, color: MUTED });
+    text("STATUS", M + 300, y, { size: 7.4, font: bold, color: MUTED });
+    y -= 6;
+    page.drawLine({ start: { x: M, y }, end: { x: A4[0] - M, y }, thickness: 0.6, color: LIGHT });
+    y -= 13;
     for (const ev of history) {
-      if (y - 16 < 96) newPage();
-      text(fmtDateTime(ev.created_at), hCols[0], y - 11, { size: 8 });
-      text(wrap(S(ev.location) || "\u2014", reg, 8, 170)[0] ?? "", hCols[1], y - 11, { size: 8 });
-      text(wrap(S(ev.description) || statusLabel(ev.status), reg, 8, CW - 360)[0] ?? "", hCols[2], y - 11, { size: 8 });
-      page.drawLine({ start: { x: M, y: y - 16 }, end: { x: A4[0] - M, y: y - 16 }, thickness: 0.5, color: LINE });
-      y -= 16;
+      if (y < 80) {
+        newPage();
+        y -= 10;
+      }
+      text(fmtDateTime(ev.created_at), M, y, { size: 8.2 });
+      text(wrap(S(ev.location) || "\u2014", reg, 8.2, 140)[0] ?? "", M + 150, y, { size: 8.2 });
+      text(wrap(S(ev.description) || statusLabel(ev.status), reg, 8.2, CW - 310)[0] ?? "", M + 300, y, { size: 8.2 });
+      y -= 13;
     }
   }
 
-  drawFooter(page);
-
-  // Page numbers
+  // ---- Footer on every page ----------------------------------------------
   const pages = doc.getPages();
   pages.forEach((p, i) => {
-    const label = `Page ${i + 1} of ${pages.length}`;
-    const w = reg.widthOfTextAtSize(label, 6.8);
-    p.drawText(label, { x: A4[0] - M - w, y: 84, size: 6.8, font: reg, color: MUTED });
-    p.drawText(`Invoice ${invoice.invoice_number}`, { x: M, y: 84, size: 6.8, font: bold, color: NAVY });
+    p.drawLine({ start: { x: M, y: 58 }, end: { x: A4[0] - M, y: 58 }, thickness: 0.7, color: LIGHT });
+    p.drawText(`${COMPANY.website}  |  ${COMPANY.email}  |  ${COMPANY.phone} (calls & text)`, {
+      x: M,
+      y: 46,
+      size: 7,
+      font: reg,
+      color: MUTED,
+    });
+    p.drawText(`${new Date().getFullYear()} \u00A9 ${COMPANY.name} - All rights reserved`, {
+      x: M,
+      y: 34,
+      size: 7,
+      font: reg,
+      color: MUTED,
+    });
+    const pn = `Page ${i + 1} of ${pages.length}`;
+    p.drawText(pn, { x: A4[0] - M - reg.widthOfTextAtSize(pn, 7), y: 34, size: 7, font: reg, color: MUTED });
+    p.drawRectangle({ x: 0, y: A4[1] - 4, width: A4[0], height: 4, color: RED });
   });
 
   return await doc.save();
