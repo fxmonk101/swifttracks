@@ -30,7 +30,7 @@ import AppHeader from "@/components/AppHeader";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import { toast } from "@/hooks/use-toast";
-import { geocode, US_CENTER } from "@/lib/geocoding";
+import { buildLocationQuery, geocode, US_CENTER } from "@/lib/geocoding";
 
 const statusClass: Record<string, string> = {
   LABEL_CREATED: "bg-muted text-muted-foreground border-border",
@@ -511,21 +511,9 @@ const TrackPage = () => {
     let cancelled = false;
     setGeoLoading(true);
     (async () => {
-      const buildQuery = (s: { street: string; city: string; state: string; zip: string; country: string }) => {
-        const segments = [s.street, s.city, s.state, s.zip, normalizeCountry(s.country) || "USA"]
-          .map((seg) => seg?.trim())
-          .filter((seg) => !!seg) as string[];
-        const unique: string[] = [];
-        for (const seg of segments) {
-          if (!unique.some((existing) => existing.toLowerCase() === seg.toLowerCase())) {
-            unique.push(seg);
-          }
-        }
-        return unique.join(", ");
-      };
       const [o, d] = await Promise.all([
-        geocode(buildQuery(shipment.sender)),
-        geocode(buildQuery(shipment.receiver)),
+        geocode(buildLocationQuery(shipment.sender)),
+        geocode(buildLocationQuery(shipment.receiver)),
       ]);
       if (cancelled) return;
       setCoords({

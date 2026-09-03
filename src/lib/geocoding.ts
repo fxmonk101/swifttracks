@@ -1,6 +1,44 @@
 // Free geocoding via OpenStreetMap Nominatim with localStorage cache
 import { Coordinates } from "./types";
 
+export const COUNTRY_OPTIONS = [
+  { value: "US", label: "United States" },
+  { value: "AE", label: "United Arab Emirates" },
+  { value: "CA", label: "Canada" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "DE", label: "Germany" },
+  { value: "FR", label: "France" },
+  { value: "ES", label: "Spain" },
+  { value: "IT", label: "Italy" },
+  { value: "JP", label: "Japan" },
+  { value: "CN", label: "China" },
+  { value: "AU", label: "Australia" },
+] as const;
+
+export const getCountryName = (country?: string | null) => {
+  const normalized = country?.trim();
+  if (!normalized) return "United States";
+  return COUNTRY_OPTIONS.find((option) => option.value === normalized)?.label || normalized;
+};
+
+export const buildLocationQuery = (address: {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string | null;
+}) => {
+  const parts = [
+    address.street,
+    address.city,
+    address.state,
+    address.zip,
+    getCountryName(address.country),
+  ].filter(Boolean);
+
+  return parts.join(", ");
+};
+
 const CACHE_KEY = "geocode-cache-v1";
 const NOMINATIM = "https://nominatim.openstreetmap.org/search";
 
