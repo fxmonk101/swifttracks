@@ -28,7 +28,7 @@ import { STATUS_LABELS, ShipmentStatus } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { buildLocationQuery, geocode, US_CENTER } from "@/lib/geocoding";
+import { COUNTRY_OPTIONS, buildLocationQuery, geocode, US_CENTER } from "@/lib/geocoding";
 import TrackingMap from "@/components/TrackingMap";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { Coordinates } from "@/lib/types";
@@ -499,20 +499,8 @@ const AdminPage = () => {
                         <SelectTrigger className="text-sm">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            { value: "US", label: "United States" },
-                            { value: "AE", label: "United Arab Emirates" },
-                            { value: "CA", label: "Canada" },
-                            { value: "GB", label: "United Kingdom" },
-                            { value: "DE", label: "Germany" },
-                            { value: "FR", label: "France" },
-                            { value: "ES", label: "Spain" },
-                            { value: "IT", label: "Italy" },
-                            { value: "JP", label: "Japan" },
-                            { value: "CN", label: "China" },
-                            { value: "AU", label: "Australia" },
-                          ].map((country) => (
+                        <SelectContent className="max-h-72">
+                          {COUNTRY_OPTIONS.map((country) => (
                             <SelectItem key={country.value} value={country.value}>{country.label}</SelectItem>
                           ))}
                         </SelectContent>
@@ -543,20 +531,8 @@ const AdminPage = () => {
                         <SelectTrigger className="text-sm">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            { value: "US", label: "United States" },
-                            { value: "AE", label: "United Arab Emirates" },
-                            { value: "CA", label: "Canada" },
-                            { value: "GB", label: "United Kingdom" },
-                            { value: "DE", label: "Germany" },
-                            { value: "FR", label: "France" },
-                            { value: "ES", label: "Spain" },
-                            { value: "IT", label: "Italy" },
-                            { value: "JP", label: "Japan" },
-                            { value: "CN", label: "China" },
-                            { value: "AU", label: "Australia" },
-                          ].map((country) => (
+                        <SelectContent className="max-h-72">
+                          {COUNTRY_OPTIONS.map((country) => (
                             <SelectItem key={country.value} value={country.value}>{country.label}</SelectItem>
                           ))}
                         </SelectContent>
