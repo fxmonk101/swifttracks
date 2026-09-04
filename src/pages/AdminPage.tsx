@@ -233,13 +233,11 @@ const AdminPage = () => {
     }
 
     const originAddress = buildLocationQuery({
-      street: shipment.sender_street ?? undefined,
       city: shipment.sender_city,
       state: shipment.sender_state,
       country: shipment.sender_country,
     });
     const destAddress = buildLocationQuery({
-      street: shipment.receiver_street ?? undefined,
       city: shipment.receiver_city,
       state: shipment.receiver_state,
       country: shipment.receiver_country,
