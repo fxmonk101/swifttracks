@@ -394,6 +394,19 @@ const fuzzyStatic = (query: string): Coordinates | null => {
 };
 
 /**
+ * Last-resort resolution: if a full address cannot be geocoded, fall back to the
+ * country centroid so shipments anywhere in the world still show on the map.
+ */
+const countryFallback = (query: string): Coordinates | null => {
+  const segments = query.split(",").map((part) => part.trim()).filter(Boolean).reverse();
+  for (const segment of segments) {
+    const center = getCountryCenter(segment);
+    if (center) return center;
+  }
+  return null;
+};
+
+/**
  * Geocode a free-form location string (city, address, or "City, State").
  * Returns coordinates or null when not found.
  * Cached in localStorage forever.
@@ -416,20 +429,20 @@ export const geocode = async (query: string): Promise<Coordinates | null> => {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return countryFallback(query);
     const data = (await res.json()) as Array<{ lat: string; lon: string }>;
-    if (!data || data.length === 0) return null;
+    if (!data || data.length === 0) return countryFallback(query);
     const coords: Coordinates = {
       lat: parseFloat(data[0].lat),
       lng: parseFloat(data[0].lon),
     };
-    if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return null;
+    if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lng)) return countryFallback(query);
     cache[key] = coords;
     saveCache(cache);
     return coords;
   } catch (err) {
     console.warn("[geocode] failed:", err);
-    return null;
+    return countryFallback(query);
   }
 };
 
