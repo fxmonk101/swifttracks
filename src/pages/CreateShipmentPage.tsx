@@ -40,7 +40,8 @@ const AddressFields = ({ prefix, t }: { prefix: string; t: (k: string) => string
       <Label>{t("createShipment.country")}</Label>
       <Select defaultValue="US">
         <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-72">
+
           {COUNTRY_OPTIONS.map((country) => (
             <SelectItem key={country.value} value={country.value}>{country.label}</SelectItem>
           ))}
