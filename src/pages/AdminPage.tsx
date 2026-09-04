@@ -28,7 +28,7 @@ import { STATUS_LABELS, ShipmentStatus } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { buildLocationQuery, geocode, US_CENTER } from "@/lib/geocoding";
+import { COUNTRY_OPTIONS, buildLocationQuery, geocode, US_CENTER } from "@/lib/geocoding";
 import TrackingMap from "@/components/TrackingMap";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { Coordinates } from "@/lib/types";
@@ -232,6 +232,23 @@ const AdminPage = () => {
       return;
     }
 
+    const originAddress = buildLocationQuery({
+      city: shipment.sender_city,
+      state: shipment.sender_state,
+      country: shipment.sender_country,
+    });
+    const destAddress = buildLocationQuery({
+      city: shipment.receiver_city,
+      state: shipment.receiver_state,
+      country: shipment.receiver_country,
+    });
+    const [originGeo, destGeo] = await Promise.all([geocode(originAddress), geocode(destAddress)]);
+    const origin =
+      Number.isFinite(Number(shipment.current_lat)) && Number.isFinite(Number(shipment.current_lng))
+        ? { lat: Number(shipment.current_lat), lng: Number(shipment.current_lng) }
+        : originGeo || US_CENTER;
+    const destination = destGeo || US_CENTER;
+
     setSimulationRunning(true);
     setSimulationProgress(0);
     let currentProgress = 0;
@@ -264,6 +281,10 @@ const AdminPage = () => {
       const { data, error } = await supabase.rpc("simulate_trip_step", {
         p_shipment_id: shipment.id,
         p_step: currentProgress,
+        p_origin_lat: origin.lat,
+        p_origin_lng: origin.lng,
+        p_dest_lat: destination.lat,
+        p_dest_lng: destination.lng,
       });
 
       if (error) {
@@ -499,20 +520,8 @@ const AdminPage = () => {
                         <SelectTrigger className="text-sm">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            { value: "US", label: "United States" },
-                            { value: "AE", label: "United Arab Emirates" },
-                            { value: "CA", label: "Canada" },
-                            { value: "GB", label: "United Kingdom" },
-                            { value: "DE", label: "Germany" },
-                            { value: "FR", label: "France" },
-                            { value: "ES", label: "Spain" },
-                            { value: "IT", label: "Italy" },
-                            { value: "JP", label: "Japan" },
-                            { value: "CN", label: "China" },
-                            { value: "AU", label: "Australia" },
-                          ].map((country) => (
+                        <SelectContent className="max-h-72">
+                          {COUNTRY_OPTIONS.map((country) => (
                             <SelectItem key={country.value} value={country.value}>{country.label}</SelectItem>
                           ))}
                         </SelectContent>
@@ -543,20 +552,8 @@ const AdminPage = () => {
                         <SelectTrigger className="text-sm">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          {[
-                            { value: "US", label: "United States" },
-                            { value: "AE", label: "United Arab Emirates" },
-                            { value: "CA", label: "Canada" },
-                            { value: "GB", label: "United Kingdom" },
-                            { value: "DE", label: "Germany" },
-                            { value: "FR", label: "France" },
-                            { value: "ES", label: "Spain" },
-                            { value: "IT", label: "Italy" },
-                            { value: "JP", label: "Japan" },
-                            { value: "CN", label: "China" },
-                            { value: "AU", label: "Australia" },
-                          ].map((country) => (
+                        <SelectContent className="max-h-72">
+                          {COUNTRY_OPTIONS.map((country) => (
                             <SelectItem key={country.value} value={country.value}>{country.label}</SelectItem>
                           ))}
                         </SelectContent>
