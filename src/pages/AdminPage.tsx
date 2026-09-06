@@ -427,7 +427,7 @@ const AdminPage = () => {
     }
 
     if (syncMapFromLocation && effectiveLocation.trim()) {
-      const g = await geocode(statusLocation.trim());
+      const g = await geocode(effectiveLocation.trim());
       if (!g) {
         toast({
           title: "Status saved — map pin unchanged",
