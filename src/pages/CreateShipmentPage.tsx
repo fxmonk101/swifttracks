@@ -48,6 +48,14 @@ const AddressFields = ({ prefix, t }: { prefix: string; t: (k: string) => string
         </SelectContent>
       </Select>
     </div>
+    <div>
+      <Label>Email address</Label>
+      <Input type="email" placeholder="name@example.com" />
+    </div>
+    <div>
+      <Label>Phone number</Label>
+      <Input type="tel" placeholder="+1 213 595-7723" />
+    </div>
   </div>
 );
 
