@@ -48,6 +48,14 @@ const AddressFields = ({ prefix, t }: { prefix: string; t: (k: string) => string
         </SelectContent>
       </Select>
     </div>
+    <div>
+      <Label>Email address</Label>
+      <Input type="email" placeholder="name@example.com" />
+    </div>
+    <div>
+      <Label>Phone number</Label>
+      <Input type="tel" placeholder="+1 213 595-7723" />
+    </div>
   </div>
 );
 
@@ -177,6 +185,30 @@ const CreateShipmentPage = () => {
                     <div>
                       <Label>{t("createShipment.height")}</Label>
                       <Input type="number" placeholder="0" min="0" />
+                    </div>
+                    <div>
+                      <Label>Number of packages</Label>
+                      <Input type="number" min="1" step="1" defaultValue="1" />
+                    </div>
+                    <div>
+                      <Label>Declared value (USD)</Label>
+                      <Input type="number" min="0" step="0.01" placeholder="0.00" />
+                    </div>
+                    <div>
+                      <Label>Pickup date</Label>
+                      <Input type="date" />
+                    </div>
+                    <div>
+                      <Label>Pickup time</Label>
+                      <Input type="time" />
+                    </div>
+                    <div>
+                      <Label>Expected delivery date</Label>
+                      <Input type="date" />
+                    </div>
+                    <div>
+                      <Label>Expected delivery time</Label>
+                      <Input type="time" />
                     </div>
                     <div className="flex items-center gap-2 mt-6">
                       <Checkbox id="signature" />

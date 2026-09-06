@@ -330,25 +330,45 @@ const AdminPage = () => {
     setCreating(true);
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
+    const str = (k: string) => ((form.get(k) as string) || "").trim();
+    const combineDateTime = (dateKey: string, timeKey: string) => {
+      const d = str(dateKey);
+      if (!d) return null;
+      const t = str(timeKey);
+      return new Date(`${d}T${t || "09:00"}:00`).toISOString();
+    };
 
     const { data, error } = await supabase
       .from("shipments")
       .insert({
         tracking_id: trackingId,
-        service_type: (form.get("serviceType") as string) || "STANDARD",
-        sender_name: form.get("senderName") as string,
-        sender_city: form.get("senderCity") as string,
-        sender_state: form.get("senderState") as string,
-        sender_country: (form.get("senderCountry") as string) || "US",
-        sender_street: form.get("senderStreet") as string,
-        receiver_name: form.get("receiverName") as string,
-        receiver_city: form.get("receiverCity") as string,
-        receiver_state: form.get("receiverState") as string,
-        receiver_country: (form.get("receiverCountry") as string) || "US",
-        receiver_street: form.get("receiverStreet") as string,
-        weight: parseFloat(form.get("weight") as string) || 0,
+        service_type: str("serviceType") || "STANDARD",
+        sender_name: str("senderName"),
+        sender_city: str("senderCity"),
+        sender_state: str("senderState"),
+        sender_country: str("senderCountry") || "US",
+        sender_street: str("senderStreet"),
+        sender_zip: str("senderZip") || null,
+        sender_email: str("senderEmail") || null,
+        sender_phone: str("senderPhone") || null,
+        receiver_name: str("receiverName"),
+        receiver_city: str("receiverCity"),
+        receiver_state: str("receiverState"),
+        receiver_country: str("receiverCountry") || "US",
+        receiver_street: str("receiverStreet"),
+        receiver_zip: str("receiverZip") || null,
+        receiver_email: str("receiverEmail") || null,
+        receiver_phone: str("receiverPhone") || null,
+        weight: parseFloat(str("weight")) || 0,
+        package_count: parseInt(str("packageCount"), 10) || 1,
         requires_signature: form.get("signature") === "on",
-        estimated_delivery_date: (form.get("estDelivery") as string) || null,
+        pickup_date: combineDateTime("pickupDate", "pickupTime"),
+        estimated_delivery_date: combineDateTime("estDelivery", "estDeliveryTime"),
+        packages_meta: {
+          contents: str("contents") || null,
+          declared_value: parseFloat(str("declaredValue")) || 0,
+          count: parseInt(str("packageCount"), 10) || 1,
+        },
         created_by: user.id,
       })
       .select()
@@ -376,11 +396,23 @@ const AdminPage = () => {
     if (!editingShipment || !newStatus) return;
     setUpdatingStatus(true);
 
+    // If no location text was typed, derive one from the status so the map pin always moves.
+    const senderPlace = [editingShipment.sender_city, editingShipment.sender_state, editingShipment.sender_country]
+      .filter(Boolean)
+      .join(", ");
+    const receiverPlace = [editingShipment.receiver_city, editingShipment.receiver_state, editingShipment.receiver_country]
+      .filter(Boolean)
+      .join(", ");
+    const atDestination = ["OUT_FOR_DELIVERY", "DELIVERED", "DELIVERY_ATTEMPTED"].includes(newStatus);
+    const atOrigin = ["LABEL_CREATED", "PICKED_UP", "RETURNED"].includes(newStatus);
+    const effectiveLocation =
+      statusLocation.trim() || (atDestination ? receiverPlace : atOrigin ? senderPlace : "");
+
     const { data, error } = await supabase.rpc("update_shipment_status", {
       p_shipment_id: editingShipment.id,
       p_new_status: newStatus,
       p_description: statusDescription || null,
-      p_location: statusLocation || null,
+      p_location: effectiveLocation || null,
     });
 
     if (error) {
@@ -394,8 +426,8 @@ const AdminPage = () => {
       return;
     }
 
-    if (syncMapFromLocation && statusLocation.trim()) {
-      const g = await geocode(statusLocation.trim());
+    if (syncMapFromLocation && effectiveLocation.trim()) {
+      const g = await geocode(effectiveLocation.trim());
       if (!g) {
         toast({
           title: "Status saved — map pin unchanged",
@@ -527,6 +559,18 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label className="text-xs">ZIP / Postal Code</Label>
+                      <Input name="senderZip" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="senderEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="senderPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Receiver</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -559,6 +603,18 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label className="text-xs">ZIP / Postal Code</Label>
+                      <Input name="receiverZip" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="receiverEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="receiverPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Package</h4>
                   <div className="grid grid-cols-2 gap-3">
@@ -581,8 +637,32 @@ const AdminPage = () => {
                       <Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Est. Delivery</Label>
+                      <Label className="text-xs">Number of Packages</Label>
+                      <Input name="packageCount" type="number" min="1" step="1" defaultValue="1" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Declared Value (USD)</Label>
+                      <Input name="declaredValue" type="number" min="0" step="0.01" placeholder="0.00" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pickup Date</Label>
+                      <Input name="pickupDate" type="date" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pickup Time</Label>
+                      <Input name="pickupTime" type="time" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Est. Delivery Date</Label>
                       <Input name="estDelivery" type="date" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Est. Delivery Time</Label>
+                      <Input name="estDeliveryTime" type="time" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Contents Description</Label>
+                      <Input name="contents" placeholder="e.g. Laptops (2)" className="text-sm" />
                     </div>
                     <div className="flex items-end gap-2 pb-1">
                       <input type="checkbox" name="signature" id="signature" className="rounded" />
