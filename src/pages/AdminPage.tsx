@@ -571,6 +571,18 @@ const AdminPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div>
+                      <Label className="text-xs">ZIP / Postal Code</Label>
+                      <Input name="receiverZip" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input name="receiverEmail" type="email" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Phone</Label>
+                      <Input name="receiverPhone" type="tel" className="text-sm" />
+                    </div>
                   </div>
                   <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Package</h4>
                   <div className="grid grid-cols-2 gap-3">
