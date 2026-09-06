@@ -330,25 +330,45 @@ const AdminPage = () => {
     setCreating(true);
     const form = new FormData(e.currentTarget);
     const trackingId = generateTrackingId();
+    const str = (k: string) => ((form.get(k) as string) || "").trim();
+    const combineDateTime = (dateKey: string, timeKey: string) => {
+      const d = str(dateKey);
+      if (!d) return null;
+      const t = str(timeKey);
+      return new Date(`${d}T${t || "09:00"}:00`).toISOString();
+    };
 
     const { data, error } = await supabase
       .from("shipments")
       .insert({
         tracking_id: trackingId,
-        service_type: (form.get("serviceType") as string) || "STANDARD",
-        sender_name: form.get("senderName") as string,
-        sender_city: form.get("senderCity") as string,
-        sender_state: form.get("senderState") as string,
-        sender_country: (form.get("senderCountry") as string) || "US",
-        sender_street: form.get("senderStreet") as string,
-        receiver_name: form.get("receiverName") as string,
-        receiver_city: form.get("receiverCity") as string,
-        receiver_state: form.get("receiverState") as string,
-        receiver_country: (form.get("receiverCountry") as string) || "US",
-        receiver_street: form.get("receiverStreet") as string,
-        weight: parseFloat(form.get("weight") as string) || 0,
+        service_type: str("serviceType") || "STANDARD",
+        sender_name: str("senderName"),
+        sender_city: str("senderCity"),
+        sender_state: str("senderState"),
+        sender_country: str("senderCountry") || "US",
+        sender_street: str("senderStreet"),
+        sender_zip: str("senderZip") || null,
+        sender_email: str("senderEmail") || null,
+        sender_phone: str("senderPhone") || null,
+        receiver_name: str("receiverName"),
+        receiver_city: str("receiverCity"),
+        receiver_state: str("receiverState"),
+        receiver_country: str("receiverCountry") || "US",
+        receiver_street: str("receiverStreet"),
+        receiver_zip: str("receiverZip") || null,
+        receiver_email: str("receiverEmail") || null,
+        receiver_phone: str("receiverPhone") || null,
+        weight: parseFloat(str("weight")) || 0,
+        package_count: parseInt(str("packageCount"), 10) || 1,
         requires_signature: form.get("signature") === "on",
-        estimated_delivery_date: (form.get("estDelivery") as string) || null,
+        pickup_date: combineDateTime("pickupDate", "pickupTime"),
+        estimated_delivery_date: combineDateTime("estDelivery", "estDeliveryTime"),
+        packages_meta: {
+          contents: str("contents") || null,
+          declared_value: parseFloat(str("declaredValue")) || 0,
+          count: parseInt(str("packageCount"), 10) || 1,
+        },
         created_by: user.id,
       })
       .select()
