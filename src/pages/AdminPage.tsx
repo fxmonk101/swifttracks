@@ -581,8 +581,32 @@ const AdminPage = () => {
                       <Input name="weight" type="number" step="0.1" defaultValue="1" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Est. Delivery</Label>
+                      <Label className="text-xs">Number of Packages</Label>
+                      <Input name="packageCount" type="number" min="1" step="1" defaultValue="1" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Declared Value (USD)</Label>
+                      <Input name="declaredValue" type="number" min="0" step="0.01" placeholder="0.00" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pickup Date</Label>
+                      <Input name="pickupDate" type="date" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Pickup Time</Label>
+                      <Input name="pickupTime" type="time" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Est. Delivery Date</Label>
                       <Input name="estDelivery" type="date" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Est. Delivery Time</Label>
+                      <Input name="estDeliveryTime" type="time" className="text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Contents Description</Label>
+                      <Input name="contents" placeholder="e.g. Laptops (2)" className="text-sm" />
                     </div>
                     <div className="flex items-end gap-2 pb-1">
                       <input type="checkbox" name="signature" id="signature" className="rounded" />
