@@ -396,11 +396,23 @@ const AdminPage = () => {
     if (!editingShipment || !newStatus) return;
     setUpdatingStatus(true);
 
+    // If no location text was typed, derive one from the status so the map pin always moves.
+    const senderPlace = [editingShipment.sender_city, editingShipment.sender_state, editingShipment.sender_country]
+      .filter(Boolean)
+      .join(", ");
+    const receiverPlace = [editingShipment.receiver_city, editingShipment.receiver_state, editingShipment.receiver_country]
+      .filter(Boolean)
+      .join(", ");
+    const atDestination = ["OUT_FOR_DELIVERY", "DELIVERED", "DELIVERY_ATTEMPTED"].includes(newStatus);
+    const atOrigin = ["LABEL_CREATED", "PICKED_UP", "RETURNED"].includes(newStatus);
+    const effectiveLocation =
+      statusLocation.trim() || (atDestination ? receiverPlace : atOrigin ? senderPlace : "");
+
     const { data, error } = await supabase.rpc("update_shipment_status", {
       p_shipment_id: editingShipment.id,
       p_new_status: newStatus,
       p_description: statusDescription || null,
-      p_location: statusLocation || null,
+      p_location: effectiveLocation || null,
     });
 
     if (error) {
@@ -414,7 +426,7 @@ const AdminPage = () => {
       return;
     }
 
-    if (syncMapFromLocation && statusLocation.trim()) {
+    if (syncMapFromLocation && effectiveLocation.trim()) {
       const g = await geocode(statusLocation.trim());
       if (!g) {
         toast({
