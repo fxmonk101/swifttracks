@@ -436,12 +436,15 @@ const TrackPage = () => {
         setDbEvents([]);
         setLocationRouteHistory([]);
       }
+      window.clearTimeout(loadingGuard);
       setLoading(false);
     })();
 
     return () => {
+      window.clearTimeout(loadingGuard);
       if (channel) supabase.removeChannel(channel);
     };
+
   }, [id]);
 
   // Build unified shipment object
