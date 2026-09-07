@@ -645,19 +645,19 @@ const AdminPage = () => {
                       <Input name="declaredValue" type="number" min="0" step="0.01" placeholder="0.00" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Pickup Date</Label>
+                      <Label className="text-xs">Departure Date</Label>
                       <Input name="pickupDate" type="date" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Pickup Time</Label>
+                      <Label className="text-xs">Departure Time</Label>
                       <Input name="pickupTime" type="time" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Est. Delivery Date</Label>
+                      <Label className="text-xs">Delivery Date</Label>
                       <Input name="estDelivery" type="date" className="text-sm" />
                     </div>
                     <div>
-                      <Label className="text-xs">Est. Delivery Time</Label>
+                      <Label className="text-xs">Delivery Time</Label>
                       <Input name="estDeliveryTime" type="time" className="text-sm" />
                     </div>
                     <div>
