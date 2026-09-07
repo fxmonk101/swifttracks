@@ -195,19 +195,19 @@ const CreateShipmentPage = () => {
                       <Input type="number" min="0" step="0.01" placeholder="0.00" />
                     </div>
                     <div>
-                      <Label>Pickup date</Label>
+                      <Label>Departure date</Label>
                       <Input type="date" />
                     </div>
                     <div>
-                      <Label>Pickup time</Label>
+                      <Label>Departure time</Label>
                       <Input type="time" />
                     </div>
                     <div>
-                      <Label>Expected delivery date</Label>
+                      <Label>Delivery date</Label>
                       <Input type="date" />
                     </div>
                     <div>
-                      <Label>Expected delivery time</Label>
+                      <Label>Delivery time</Label>
                       <Input type="time" />
                     </div>
                     <div className="flex items-center gap-2 mt-6">
