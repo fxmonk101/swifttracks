@@ -274,14 +274,20 @@ const TrackPage = () => {
       setLocationRouteHistory(pts);
     };
 
+    // Never leave the page spinning forever if the network stalls.
+    const loadingGuard = window.setTimeout(() => setLoading(false), 12000);
+
     (async () => {
-      const { data: shipment, error: sErr } = await supabase
-        .from("shipments")
-        .select("*")
-        .eq("tracking_id", id)
-        .maybeSingle();
+      const query = supabase.from("shipments").select("*").eq("tracking_id", id).maybeSingle();
+      const { data: shipment, error: sErr } = (await Promise.race([
+        query,
+        new Promise((resolve) =>
+          window.setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 12000)
+        ),
+      ])) as { data: DBShipment | null; error: { message: string } | null };
 
       if (sErr) console.error("[TrackPage] shipment fetch error:", sErr);
+
 
       if (shipment) {
         const normalized: DBShipment =
@@ -430,12 +436,15 @@ const TrackPage = () => {
         setDbEvents([]);
         setLocationRouteHistory([]);
       }
+      window.clearTimeout(loadingGuard);
       setLoading(false);
     })();
 
     return () => {
+      window.clearTimeout(loadingGuard);
       if (channel) supabase.removeChannel(channel);
     };
+
   }, [id]);
 
   // Build unified shipment object
